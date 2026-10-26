@@ -167,6 +167,28 @@ Future exploration goals include somewhat realistic black holes, fractals, wormh
 - World +Y remains up, with initial camera tilt limited to ±89 degrees. Defining new distance functions does not yet add curved-ray or non-Euclidean traversal.
 - Cast shadows and ambient occlusion remain future work. The sphere and cube provide a more useful starting scene for developing those effects.
 
+## 2026-10-26 — Milestone 6: Menger sponge fractal scene
+
+### Implemented and decisions
+
+- Added `scenes/menger.clj`, a turquoise Menger sponge centered at `[10 0 0]`, with side length 6 and three subdivision levels. The camera views three faces from above and to one side; an angled directional light gives the visible faces contrasting brightness.
+- Added a reusable `fractals/menger-sponge` constructor accepting center, full side length, and depth 0–6. Depth 0 is a solid cube. Higher levels repeatedly remove the central cross of each cell.
+- Evaluated repeated cell coordinates and tunnel cuts inside a signed distance bound instead of generating all `20^depth` remaining cubes. World-space scaling preserves distance units, so the existing marcher and normal estimation can use the function unchanged.
+- Tuned this scene's hit tolerance and normal sampling to 0.0005, with a 512-step marching budget. Other scenes and the default scene retain their settings.
+- Added launch instructions and editable depth guidance to the README/custom-scene tutorial, and saved a 960 × 720 rendered preview at `docs/images/menger.png`.
+
+### Verification
+
+- `clojure -M:test`: 22 tests, 10,642 assertions, zero failures/errors. Compared solid membership and conservative exterior distances against an independently constructed union of recursive leaf cubes at depths 0–2. Also checked a ray passing through the central tunnel, a ray hitting retained material, world scaling/translation, validation, and scene loading.
+- Rendered and visually inspected the fractal while tuning its light and framing, then exported the final 960 × 720 preview through `--scene scenes/menger.clj`.
+- Verified the desktop viewer loaded the scene's starting camera, rendered outside Swing's event dispatch thread, and produced both preview and full-resolution images.
+
+### Limitations and next steps
+
+- This is a finite approximation of the Menger sponge, using a conservative distance bound rather than an exact Euclidean distance everywhere. Increasing depth raises CPU cost and needs sufficient image resolution and suitably small sampling tolerances.
+- The scene uses existing diffuse lighting only; no cast shadows or ambient occlusion were introduced. Those effects would improve the depth cues inside the tunnels.
+- The new scene is selected with `--scene`; the sphere-and-cube scene remains the built-in default. Camera controls work through the existing viewer.
+
 ## Future entry checklist
 
 For each session, record the date, objective, completed changes, reasons for decisions, checks and results, unresolved issues, and next steps. Focus on rendering development; omit repository housekeeping and editorial changes. Include measured performance only after actual runs, with settings and machine context.

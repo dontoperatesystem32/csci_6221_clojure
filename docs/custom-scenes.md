@@ -118,6 +118,22 @@ Flat mode uses the fixed debug silhouette colors. Without `--lighting`, the scen
 
 Increase `:max-steps` if magenta pixels indicate unresolved rays. Increase `:max-distance` when moving geometry farther away. `:epsilon` controls how close a ray must get to count as a hit; it is a positive distance in world units. More steps and tighter tolerances can cost more CPU time.
 
+## Fractal example
+
+Load `scenes/menger.clj` for a complete fractal scene:
+
+```sh
+clojure -M:run --scene scenes/menger.clj --width 960 --height 720
+```
+
+To use the shape in your own scene, add `[ray-marcher.fractals :as fractals]` to its namespace's `:require`, then use:
+
+```clojure
+:scene-distance (fractals/menger-sponge [10 0 0] 6 3)
+```
+
+Arguments are center, full side length, and depth (0–6). The supplied scene uses depth 3, a smaller hit tolerance and normal step of 0.0005, and a 512-step budget. Lower depth to 2 for less CPU work; higher depth needs finer sampling and more pixels to show additional detail. This is a finite signed distance bound, not an infinitely detailed object or an exact distance everywhere.
+
 ## 7. Define a new shape with code
 
 You can provide your own signed-distance functions rather than being limited to the constructors. For example, a horizontal floor at Y = -2 has signed distance `y + 2`:

@@ -37,6 +37,20 @@ clojure -M:run --scene scenes/example.clj --lighting valve-half-lambert --output
 
 See the [custom-scene tutorial](docs/custom-scenes.md) for a complete copyable example, coordinate conventions, object sizes, and how to define new distance functions. Scene files are ordinary executable Clojure. Without `--scene`, the built-in sphere-and-cube scene is used. A CLI lighting choice overrides the scene's model while preserving its other lighting settings.
 
+## Fractal scene
+
+Explore a turquoise Menger sponge: a cube with three levels of repeating square tunnels, viewed from above and to one side.
+
+```sh
+clojure -M:run --scene scenes/menger.clj --width 960 --height 720
+```
+
+![Menger sponge](docs/images/menger.png)
+
+Edit `scenes/menger.clj` to change its camera, color, light, or the depth in `(fractals/menger-sponge [10 0 0] 6 3)`. The arguments are center, full side length, and subdivision depth. Depth 2 is lighter to render; depth 4 reveals smaller tunnels. Supported depths are 0–6, with 0 producing a solid cube. Finer detail needs tighter hit/normal tolerances and enough image resolution.
+
+The function evaluates repeated tunnel cuts rather than enumerating individual cubes. It supplies a conservative distance bound; it is a finite approximation of the fractal, with no cast shadows or ambient occlusion yet. More detail increases CPU cost. [Menger sponge construction reference](https://www.cs.utexas.edu/~fussell/courses/cs354/assignments/menger/handout.shtml).
+
 ## Camera controls
 
 Focus the viewer window to use the keyboard. Hold the left mouse button and drag over the image to look around; release it to stop looking. No system pointer capture is required.
@@ -76,8 +90,10 @@ See [lighting.md](docs/lighting.md) for the formulas, normal estimation, differe
 - `src/ray_marcher/core.clj`: startup and command-line options.
 - `src/ray_marcher/vector.clj`: basic 3D vector operations.
 - `src/ray_marcher/scene.clj`: sphere, cube, box, and scene union.
+- `src/ray_marcher/fractals.clj`: finite Menger sponge distance bounds.
 - `src/ray_marcher/scene_file.clj`: scene loading, validation, and camera preparation.
 - `scenes/example.clj`: editable custom-scene example.
+- `scenes/menger.clj`: framed and lit Menger sponge scene.
 - `src/ray_marcher/march.clj`: independent single-ray marcher.
 - `src/ray_marcher/camera.clj`: perspective camera and pixel ray directions.
 - `src/ray_marcher/render.clj`: sequential image rendering.
