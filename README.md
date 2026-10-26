@@ -1,6 +1,6 @@
 # CSCI 6221 — Clojure Ray Marcher
 
-This repository contains the CPU ray-marcher final project. Language-evaluation slides, scripts, assignment materials, and examples are collected in the separate [Clojure folder](../clojure/README.md). The current MVP renders a sphere using CPU sphere tracing and displays the result in a desktop window or saves it as a PNG.
+This repository contains the CPU ray-marcher final project. Language-evaluation slides, scripts, assignment materials, and examples are collected in the separate [Clojure folder](../clojure/README.md). The current MVP renders signed-distance scenes using CPU sphere tracing and displays the result in a desktop window or saves it as a PNG.
 
 ## Run the application
 
@@ -10,7 +10,7 @@ Install a JDK (17 or newer) and the Clojure CLI. From this repository's root:
 clojure -M:run
 ```
 
-The first run downloads Clojure and its dependencies. A window displays an orange sphere with matte lighting on a dark background. The camera is at `(0, 0, 0)`, looks along **+X**, and sees a sphere centered at `(10, 0, 0)` with radius `2`. The camera uses +Y as up and a 60° vertical field of view. The surface normal is estimated from the scene distance field and shaded using one directional light plus a small ambient fill.
+The first run downloads Clojure and its dependencies. A window displays an orange sphere and cube with matte lighting on a dark background. The camera is at `(0, 0, 0)`, looks along **+X**, and sees a sphere centered at `(10, 0, -2)` with radius `2` and a cube centered at `(12, 0, 2)` with side length `3`. Coordinates are `[X Y Z]`, so Y is height and both centers have height zero. The camera uses +Y as up and a 60° vertical field of view. The surface normal is estimated from the scene distance field and shaded using one directional light plus a small ambient fill.
 
 Image dimensions are configurable independently of the window size. The image scales to fit the window while keeping its aspect ratio; resizing the window does not change the render resolution.
 
@@ -26,6 +26,17 @@ clojure -M:run --width 800 --height 450 --output preview.png
 
 The destination directory must already exist. Use `clojure -M:run --help` for options. This milestone does not impose a practical image-size cap; very large dimensions can exhaust memory.
 
+## Custom scenes
+
+Load your own geometry, camera, lighting, and marching settings from a Clojure file:
+
+```sh
+clojure -M:run --scene scenes/example.clj
+clojure -M:run --scene scenes/example.clj --lighting valve-half-lambert --output custom.png
+```
+
+See the [custom-scene tutorial](docs/custom-scenes.md) for a complete copyable example, coordinate conventions, object sizes, and how to define new distance functions. Scene files are ordinary executable Clojure. Without `--scene`, the built-in sphere-and-cube scene is used. A CLI lighting choice overrides the scene's model while preserving its other lighting settings.
+
 ## Camera controls
 
 Focus the viewer window to use the keyboard. Hold the left mouse button and drag over the image to look around; release it to stop looking. No system pointer capture is required.
@@ -36,14 +47,14 @@ Focus the viewer window to use the keyboard. Hold the left mouse button and drag
 | A / D | Strafe left / right along that plane |
 | Shift / Control | Move up / down along world Y |
 | Left-button mouse drag | Turn and tilt the camera |
-| R | Reset the original camera position and orientation |
+| R | Reset the selected scene's starting camera |
 | Escape | Clear held movement and stop the current mouse drag |
 
 Movement follows camera heading but stays horizontal even when looking up or down. Speed is 3 world units per second; diagonal movement has the same speed. Pitch is limited to ±89° to avoid flipping. Switching to another window clears held input. There is no collision detection: flying inside the sphere produces the marcher's existing immediate-hit behavior.
 
 During movement the viewer requests previews with a maximum dimension of 240 pixels, scaled to fit the window. After 250 ms without camera changes it requests the configured full resolution. One background worker processes the latest pending view; previews may briefly lag the current camera, while obsolete full renders are cancelled. Actual refresh speed depends on scene cost and hardware; this is not a fixed-frame-rate renderer. The status line identifies preview/full resolution and the camera position used for the displayed image.
 
-PNG export uses the original camera, without opening the interactive window.
+PNG export uses the selected scene's starting camera, without opening the interactive window.
 
 ## Lighting
 
@@ -64,7 +75,9 @@ See [lighting.md](docs/lighting.md) for the formulas, normal estimation, differe
 
 - `src/ray_marcher/core.clj`: startup and command-line options.
 - `src/ray_marcher/vector.clj`: basic 3D vector operations.
-- `src/ray_marcher/scene.clj`: sphere distance function and scene union.
+- `src/ray_marcher/scene.clj`: sphere, cube, box, and scene union.
+- `src/ray_marcher/scene_file.clj`: scene loading, validation, and camera preparation.
+- `scenes/example.clj`: editable custom-scene example.
 - `src/ray_marcher/march.clj`: independent single-ray marcher.
 - `src/ray_marcher/camera.clj`: perspective camera and pixel ray directions.
 - `src/ray_marcher/render.clj`: sequential image rendering.
@@ -95,4 +108,4 @@ The renderer casts one ray through each pixel center and accounts for image aspe
 clojure -M:test
 ```
 
-Tests cover known sphere distances, a center hit at `(8, 0, 0)`, misses, travel and step limits, starting inside a sphere, camera directions, and image pixels checked against an independent analytic ray–sphere intersection calculation. Both portrait and landscape images and an off-center sphere are checked. Lighting tests check normals against known geometry, front/side/back illumination, ambient fill, color conversion, and the rendered light direction. Additional tests check movement speed, horizontal travel while tilted, diagonal normalization, pitch limits, cancellation, and replacement of pending views. Tests require no graphical desktop.
+Tests cover known sphere distances, a center hit at `(8, 0, 0)`, misses, travel and step limits, starting inside a sphere, camera directions, and image pixels checked against an independent analytic ray–sphere intersection calculation. Both portrait and landscape images and an off-center sphere are checked. Lighting tests check normals against known geometry, front/side/back illumination, ambient fill, color conversion, and the rendered light direction. Scene tests check box distances, the two-object default, file loading, validation, custom camera setup, and CLI lighting overrides. Additional tests check movement speed, horizontal travel while tilted, diagonal normalization, pitch limits, cancellation, and replacement of pending views. Tests require no graphical desktop.

@@ -2,10 +2,11 @@
   "Application entry point: interactive window or a single PNG export."
   (:require [ray-marcher.image :as image]
             [ray-marcher.render :as render]
+            [ray-marcher.scene-file :as scene-file]
             [ray-marcher.ui :as ui]))
 
 (def usage
-  "Usage: clojure -M:run [--width N] [--height N] [--lighting lambert|half-lambert|valve-half-lambert|flat] [--output FILE] [--help]\nDefaults: 800 × 450 pixels, Lambert lighting. --output saves a PNG instead of opening a window.")
+  "Usage: clojure -M:run [--width N] [--height N] [--scene FILE.clj] [--lighting lambert|half-lambert|valve-half-lambert|flat] [--output FILE] [--help]\nDefaults: 800 × 450 pixels, Lambert lighting. --output saves a PNG instead of opening a window.")
 
 (defn- positive-dimension [flag value]
   (let [n (parse-long (or value ""))]
@@ -25,24 +26,35 @@
           "--lighting" (if (#{"lambert" "half-lambert" "valve-half-lambert" "flat"} value)
                          (recur remaining (assoc options :lighting (keyword value)))
                          (throw (ex-info "--lighting requires lambert, half-lambert, valve-half-lambert, or flat." {})))
+          "--scene" (if (or (nil? value) (.startsWith ^String value "--"))
+                      (throw (ex-info "--scene requires a Clojure scene-file path." {}))
+                      (recur remaining (assoc options :scene value)))
           "--output" (if (or (nil? value) (.startsWith ^String value "--"))
                        (throw (ex-info "--output requires a file path." {}))
                        (recur remaining (assoc options :output value)))
           (throw (ex-info (str "Unknown option: " flag) {})))))))
 
+(defn configure-lighting
+  "A CLI lighting choice overrides only the model, preserving scene light settings."
+  [render-options mode]
+  (case mode
+    nil render-options
+    :flat (assoc render-options :color-fn render/silhouette-color)
+    (assoc-in render-options [:lighting :diffuse-model] mode)))
+
 (defn -main [& args]
   (try
-    (let [{:keys [width height output help? lighting]} (parse-options args)
-          rendering-options (if (= lighting :flat)
-                              {:color-fn render/silhouette-color}
-                              {:lighting {:diffuse-model (or lighting :lambert)}})
-          render-view (fn [w h options]
-                        (render/render-image w h (merge rendering-options options)))]
+    (let [{:keys [width height output help? lighting scene]} (parse-options args)]
       (if help?
         (println usage)
-        (if output
-          (println "Saved" (.getAbsolutePath (image/save-png! (render-view width height {}) output)))
-          (ui/show-viewer! width height render-view))))
+        (let [{:keys [render-options camera-state]}
+              (if scene (scene-file/load-scene scene) (scene-file/default-scene))
+              configured (configure-lighting render-options lighting)
+              render-view (fn [w h options]
+                            (render/render-image w h (merge configured options)))]
+          (if output
+            (println "Saved" (.getAbsolutePath (image/save-png! (render-view width height {}) output)))
+            (ui/show-viewer! width height render-view camera-state)))))
     (catch Exception e
       (binding [*out* *err*]
         (println "Could not start:" (.getMessage e))

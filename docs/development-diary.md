@@ -141,6 +141,32 @@ Future exploration goals include somewhat realistic black holes, fractals, wormh
 - Verification: 14 tests, 10,313 assertions, zero failures/errors. Checked Valve's angular response at five orientations and CLI acceptance of the new option. Successfully exported and visually inspected a PNG using the new command-line mode.
 - Existing lighting limitations remain: no cast shadows or ambient occlusion yet. The new mode changes only the diffuse angular response.
 
+## 2026-10-26 — Milestone 5: sphere-and-cube scene and custom scene files
+
+### Implemented and decisions
+
+- Updated the built-in scene to a radius-2 sphere at `[10 0 -2]` and a side-length-3 cube at `[12 0 2]`. Coordinates use `[X Y Z]` with Y as height; the requested zero-height positions were interpreted accordingly.
+- Added exact signed-distance constructors for axis-aligned boxes and cubes. Boxes accept three half-sizes; cubes accept a full side length. Both integrate with scene union, normal estimation, and existing lighting.
+- Added `--scene FILE.clj`. A scene file returns a map containing a distance function and optional camera, lighting, and marching settings. Ordinary Clojure functions allow new geometry without changing the renderer or building a separate expression parser.
+- Added validation for configuration keys, camera points, marching limits, and lighting settings. Scene files are executable local Clojure; distance functions are expected to be pure and provide safe distance values.
+- Scene cameras specify `:position`, `:look-at`, and vertical `:fov`. The viewer starts from that camera, and R returns to that scene's starting pose. PNG export uses the same initial camera. Camera coordinates written as integers are supported in the status display.
+- A command-line lighting option overrides only the selected scene's diffuse model, preserving its light direction, ambient fill, and base color. Without that option, the scene's lighting model is respected.
+- Added `scenes/example.clj` with the two objects, a different camera, and blue base color, plus a complete custom-scene tutorial covering axes, geometry, camera, lighting, marching limits, and an example custom floor distance function.
+
+### Verification
+
+- `clojure -M:test`: 19 tests, 10,353 assertions, zero failures/errors. Added known box face/edge/corner distances, default-layout ray hits, scene-file loading, custom camera conversion, configuration validation, and CLI override checks.
+- Made the original sphere-only geometry and normal tests use an explicit fixture so future changes to the default demonstration scene cannot silently change those tests' meaning.
+- Exported and visually inspected the default sphere/cube scene and the supplied custom scene with a CLI Valve half-Lambert override.
+- Extracted the complete tutorial scene into a file and rendered it through `--scene`; its PNG checksum exactly matched the equivalent built-in scene render.
+- Verified the custom scene in the desktop viewer: starting camera `(0, 1, -4)`, movement, mouse look, reset to the scene camera, focus/escape stopping, full-resolution completion, and renderer shutdown after closing. Corrected status formatting for integer camera coordinates during this check.
+
+### Limitations and next steps
+
+- Custom scene files are loaded at startup; editing a file requires restarting the viewer. Geometry uses a shared scene-wide base color, with no per-object materials or built-in object rotations yet.
+- World +Y remains up, with initial camera tilt limited to ±89 degrees. Defining new distance functions does not yet add curved-ray or non-Euclidean traversal.
+- Cast shadows and ambient occlusion remain future work. The sphere and cube provide a more useful starting scene for developing those effects.
+
 ## Future entry checklist
 
 For each session, record the date, objective, completed changes, reasons for decisions, checks and results, unresolved issues, and next steps. Focus on rendering development; omit repository housekeeping and editorial changes. Include measured performance only after actual runs, with settings and machine context.

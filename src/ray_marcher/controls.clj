@@ -6,6 +6,16 @@
 (def initial-state
   {:position [0.0 0.0 0.0] :yaw 0.0 :pitch 0.0 :fov 60.0})
 
+(defn from-camera
+  "Convert a world-up perspective camera into the viewer's initial/reset pose."
+  [{:keys [origin forward half-height]}]
+  (let [[x y z] forward
+        pitch (Math/asin (max -1.0 (min 1.0 y)))]
+    (when (> (Math/abs pitch) (+ (Math/toRadians 89.0) 1.0e-10))
+      (throw (ex-info "Interactive camera pitch must be within +/-89 degrees." {})))
+    {:position origin :yaw (Math/atan2 z x) :pitch pitch
+     :fov (Math/toDegrees (* 2.0 (Math/atan half-height)))}))
+
 (defn look
   "Apply mouse displacement in pixels. Positive dx turns right; negative dy looks up."
   [state dx dy]

@@ -16,13 +16,15 @@
 (defn show-viewer!
   "Open an interactive viewer. render-fn is independent of Swing and accepts
   width, height, and rendering options. Drag the left mouse button to look."
-  [width height render-fn]
+  ([width height render-fn]
+   (show-viewer! width height render-fn controls/initial-state))
+  ([width height render-fn initial-state]
   (when (GraphicsEnvironment/isHeadless)
     (throw (ex-info "A graphical desktop is required. Use --output preview.png instead." {})))
   (SwingUtilities/invokeLater
    (fn []
      (let [frame (JFrame. "Clojure Ray Marcher")
-           state (atom controls/initial-state)
+           state (atom initial-state)
            revision (atom 0)
            held (atom #{})
            drag (atom nil)
@@ -62,7 +64,7 @@
                              (reset! picture image)
                              (.repaint canvas)
                              (.setText status
-                               (let [[x y z] (:origin camera)]
+                               (let [[x y z] (mapv double (:origin camera))]
                                  (format "%s %d × %d | Camera (%.2f, %.2f, %.2f)"
                                          (if preview? "Preview" "Full resolution")
                                          (.getWidth ^BufferedImage image)
@@ -87,7 +89,7 @@
                      (do (clear-input!) true)
 
                      (and pressed? (= code KeyEvent/VK_R))
-                     (do (clear-input!) (change! controls/initial-state) true)
+                     (do (clear-input!) (change! initial-state) true)
 
                      :else false))
                  false)))
@@ -148,4 +150,4 @@
        (.setSize frame 900 600)
        (.setLocationRelativeTo frame nil)
        (.setVisible frame true)
-       (.start timer)))))
+       (.start timer))))))
