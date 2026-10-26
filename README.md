@@ -24,6 +24,8 @@ To save the same image without opening a window:
 clojure -M:run --width 800 --height 450 --output preview.png
 ```
 
+PNG exports show a live terminal progress bar with percentage and completed rows. Without an attached Java terminal console, progress is printed in occasional lines instead. Progress uses stderr; stdout retains the final saved-file message. At 100% of rows, a `Writing PNG...` message covers image encoding and saving. The percentage measures image rows, not estimated remaining time: detailed rows can take longer than background rows. No extra flag is needed, and interactive camera rendering stays unchanged.
+
 The destination directory must already exist. Use `clojure -M:run --help` for options. This milestone does not impose a practical image-size cap; very large dimensions can exhaust memory.
 
 ## Custom scenes
@@ -39,7 +41,7 @@ See the [custom-scene tutorial](docs/custom-scenes.md) for a complete copyable e
 
 ## Fractal scene
 
-Explore a turquoise Menger sponge: a cube with three levels of repeating square tunnels, viewed from above and to one side.
+Explore a turquoise Menger sponge: a cube with repeating square tunnels, viewed from above and to one side. The scene is currently set to depth 5; the saved preview below shows depth 3.
 
 ```sh
 clojure -M:run --scene scenes/menger.clj --width 960 --height 720
@@ -47,7 +49,7 @@ clojure -M:run --scene scenes/menger.clj --width 960 --height 720
 
 ![Menger sponge](docs/images/menger.png)
 
-Edit `scenes/menger.clj` to change its camera, color, light, or the depth in `(fractals/menger-sponge [10 0 0] 6 3)`. The arguments are center, full side length, and subdivision depth. Depth 2 is lighter to render; depth 4 reveals smaller tunnels. Supported depths are 0–6, with 0 producing a solid cube. Finer detail needs tighter hit/normal tolerances and enough image resolution.
+Edit `scenes/menger.clj` to change its camera, color, light, or the depth in `(fractals/menger-sponge [10 0 0] 6 5)`. The arguments are center, full side length, and subdivision depth. Depth 2 is lighter to render; depth 4 reveals smaller tunnels. Supported depths are 0–6, with 0 producing a solid cube. Finer detail needs tighter hit/normal tolerances and enough image resolution.
 
 The function evaluates repeated tunnel cuts rather than enumerating individual cubes. It supplies a conservative distance bound; it is a finite approximation of the fractal, with no cast shadows or ambient occlusion yet. More detail increases CPU cost. [Menger sponge construction reference](https://www.cs.utexas.edu/~fussell/courses/cs354/assignments/menger/handout.shtml).
 
@@ -99,6 +101,7 @@ See [lighting.md](docs/lighting.md) for the formulas, normal estimation, differe
 - `src/ray_marcher/render.clj`: sequential image rendering.
 - `src/ray_marcher/lighting.clj`: distance-field normals, diffuse shading, and color conversion.
 - `src/ray_marcher/image.clj`: PNG output.
+- `src/ray_marcher/progress.clj`: terminal progress reporting for PNG exports.
 - `src/ray_marcher/controls.clj`: camera movement and mouse-look calculations.
 - `src/ray_marcher/worker.clj`: background rendering with one pending view.
 - `src/ray_marcher/ui.clj`: interactive Swing viewer and input handling.
@@ -116,7 +119,7 @@ Results distinguish `:hit`, `:miss` (travel limit), and `:step-limit` (unresolve
 
 The renderer casts one ray through each pixel center and accounts for image aspect ratio. Shaded orange means a hit, dark blue means a miss, and magenta means the step budget was exhausted. Near a silhouette, the finite surface tolerance can slightly expand the apparent shape. Pixel rendering is sequential, with no antialiasing, cast shadows, or reflections yet.
 
-`render-image` accepts an optional map with `:scene-distance`, `:camera`, `:settings`, and `:color-fn`. Scene construction and camera setup happen independently of the marcher. The default lighting function uses the hit position and scene distance function to estimate an outward normal. Shadow rays remain future work. An optional `:cancelled?` predicate is checked between image rows; cancellation returns `nil`. The viewer uses this to abandon obsolete full-resolution frames. Pixel calculations remain sequential within each frame; background rendering does not yet use multiple CPU cores for a single image.
+`render-image` accepts an optional map with `:scene-distance`, `:camera`, `:settings`, and `:color-fn`. Scene construction and camera setup happen independently of the marcher. The default lighting function uses the hit position and scene distance function to estimate an outward normal. Shadow rays remain future work. An optional `:on-progress` callback receives `(completed-rows total-rows)` initially at zero and after each completed row. The renderer does not print progress itself. An optional `:cancelled?` predicate is checked between image rows; cancellation returns `nil`. The viewer uses this to abandon obsolete full-resolution frames. Pixel calculations remain sequential within each frame; background rendering does not yet use multiple CPU cores for a single image.
 
 ## Verification
 

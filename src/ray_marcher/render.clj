@@ -15,18 +15,20 @@
     :step-limit 0xFF00FF))
 
 (defn render-image
-  "One ray per pixel. Returns nil if cancelled? becomes true between rows.
+  "One ray per pixel. Optional on-progress receives completed rows and total rows.
+  Returns nil if cancelled? becomes true between rows.
   Scene, camera, marching settings, and coloring are replaceable.
   Magenta marks a ray that exhausted its step budget, rather than a proven miss."
   ([width height]
    (render-image width height {}))
-  ([width height {:keys [scene-distance camera settings color-fn cancelled? lighting]
+  ([width height {:keys [scene-distance camera settings color-fn cancelled? lighting on-progress]
                  :or {scene-distance scene/default-scene
                       camera camera/default-camera
                       settings march/default-settings
                       cancelled? (constantly false)}}]
    (let [image (BufferedImage. width height BufferedImage/TYPE_INT_RGB)
          shade (or color-fn (lighting/make-shader scene-distance lighting))]
+     (when on-progress (on-progress 0 height))
      (loop [y 0]
        (cond
          (cancelled?) nil
@@ -37,4 +39,5 @@
              (let [direction (camera/ray-direction camera x y width height)
                    result (march/raymarch scene-distance (:origin camera) direction settings)]
                (.setRGB image x y (int (shade result)))))
+           (when on-progress (on-progress (inc y) height))
            (recur (inc y))))))))

@@ -2,7 +2,7 @@
   (:require [ray-marcher.fractals :as fractals]))
 
 ;; A turquoise cube carved into repeating tunnels. Y is height.
-;; Change depth to 2 for a lighter render, or 4 for finer detail.
+;; Current depth is 5. Use 2 for a lighter render or 3 to match the saved preview.
 {:scene-distance (fractals/menger-sponge [10 0 0] 6 5)
 
  :camera {:position [-1 6 -9]

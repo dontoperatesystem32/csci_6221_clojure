@@ -1,6 +1,7 @@
 (ns ray-marcher.core
   "Application entry point: interactive window or a single PNG export."
   (:require [ray-marcher.image :as image]
+            [ray-marcher.progress :as progress]
             [ray-marcher.render :as render]
             [ray-marcher.scene-file :as scene-file]
             [ray-marcher.ui :as ui]))
@@ -53,7 +54,13 @@
               render-view (fn [w h options]
                             (render/render-image w h (merge configured options)))]
           (if output
-            (println "Saved" (.getAbsolutePath (image/save-png! (render-view width height {}) output)))
+            (let [{:keys [report! writing! finish!]} (progress/reporter)
+                  file (try
+                         (let [picture (render-view width height {:on-progress report!})]
+                           (writing!)
+                           (image/save-png! picture output))
+                         (finally (finish!)))]
+              (println "Saved" (.getAbsolutePath file)))
             (ui/show-viewer! width height render-view camera-state)))))
     (catch Exception e
       (binding [*out* *err*]

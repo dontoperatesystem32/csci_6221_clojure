@@ -132,7 +132,7 @@ To use the shape in your own scene, add `[ray-marcher.fractals :as fractals]` to
 :scene-distance (fractals/menger-sponge [10 0 0] 6 3)
 ```
 
-Arguments are center, full side length, and depth (0–6). The supplied scene uses depth 3, a smaller hit tolerance and normal step of 0.0005, and a 512-step budget. Lower depth to 2 for less CPU work; higher depth needs finer sampling and more pixels to show additional detail. This is a finite signed distance bound, not an infinitely detailed object or an exact distance everywhere.
+Arguments are center, full side length, and depth (0–6). The supplied scene is currently set to depth 5 (the saved preview shows depth 3), a smaller hit tolerance and normal step of 0.0005, and a 512-step budget. Lower depth to 2 for less CPU work; higher depth needs finer sampling and more pixels to show additional detail. This is a finite signed distance bound, not an infinitely detailed object or an exact distance everywhere.
 
 ## 7. Define a new shape with code
 

@@ -189,6 +189,16 @@ Future exploration goals include somewhat realistic black holes, fractals, wormh
 - The scene uses existing diffuse lighting only; no cast shadows or ambient occlusion were introduced. Those effects would improve the depth cues inside the tunnels.
 - The new scene is selected with `--scene`; the sphere-and-cube scene remains the built-in default. Camera controls work through the existing viewer.
 
+## 2026-10-26 — PNG export progress
+
+- Added an optional renderer callback receiving completed image rows and total rows, starting at zero and reporting each finished row. Rendering remains independent of console output and Swing.
+- PNG exports now show an ASCII progress bar with percentage and row counts. Terminal updates reuse one line and occur at percentage changes. Without an attached Java console, updates are limited to approximately ten-percent milestones on separate lines.
+- Progress is written to stderr, preserving the final saved-file message on stdout. Once rows are complete, a `Writing PNG...` message covers PNG encoding and saving. Terminal status is cleared on completion or failure through cleanup in `finally`.
+- The progress callback is supplied only for PNG exports; interactive previews and camera controls retain their existing behavior.
+- Verification: 26 tests, 10,657 assertions, zero failures/errors. Added checks for accurate row counts, cancellation without a false completion event, identical image pixels with/without reporting, bounded non-interactive output, and terminal-line cleanup.
+- Ran an actual terminal export and redirected 960 × 720 fractal exports. Verified zero-to-100-percent row reporting, the writing phase, and clean stdout. A temporary depth-3 scene copy produced a PNG checksum identical to the original depth-3 preview; the current depth-5 scene setting was preserved.
+- Limitation: percentage describes completed rows rather than predicted time; rows crossing detailed geometry can take longer. PNG encoding has a status message rather than its own measured percentage. Progress is currently synchronous with the sequential renderer.
+
 ## Future entry checklist
 
 For each session, record the date, objective, completed changes, reasons for decisions, checks and results, unresolved issues, and next steps. Focus on rendering development; omit repository housekeeping and editorial changes. Include measured performance only after actual runs, with settings and machine context.
