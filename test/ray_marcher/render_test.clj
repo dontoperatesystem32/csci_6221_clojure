@@ -6,6 +6,8 @@
             [ray-marcher.scene :as scene]
             [ray-marcher.vector :as v]))
 
+(def single-sphere (scene/sphere [10 0 0] 2))
+
 (defn close? [a b] (< (Math/abs (double (- a b))) 1.0e-9))
 
 (deftest sphere-distances
@@ -16,21 +18,21 @@
     (is (close? 0 ((scene/union distance (scene/sphere [0 5 0] 1)) [0 4 0])))))
 
 (deftest single-ray-outcomes
-  (let [hit (march/raymarch scene/default-scene [0 0 0] [1 0 0])]
+  (let [hit (march/raymarch single-sphere [0 0 0] [1 0 0])]
     (is (= :hit (:status hit)))
     (is (close? 8 (:distance hit)))
     (is (= [8.0 0.0 0.0] (:position hit))))
-  (is (= :miss (:status (march/raymarch scene/default-scene [0 0 0] [-1 0 0]))))
-  (is (= :miss (:status (march/raymarch scene/default-scene [0 0 0] [0 1 0]))))
+  (is (= :miss (:status (march/raymarch single-sphere [0 0 0] [-1 0 0]))))
+  (is (= :miss (:status (march/raymarch single-sphere [0 0 0] [0 1 0]))))
   (is (= :miss (:status (march/raymarch (scene/union) [0 0 0] [1 0 0]))))
-  (is (= :miss (:status (march/raymarch scene/default-scene [0 0 0] [1 0 0]
+  (is (= :miss (:status (march/raymarch single-sphere [0 0 0] [1 0 0]
                                       {:max-distance 7}))))
-  (is (= :hit (:status (march/raymarch scene/default-scene [0 0 0] [1 0 0]
+  (is (= :hit (:status (march/raymarch single-sphere [0 0 0] [1 0 0]
                                      {:max-distance 8}))))
-  (is (= :step-limit (:status (march/raymarch scene/default-scene [0 0 0] [1 0 0]
+  (is (= :step-limit (:status (march/raymarch single-sphere [0 0 0] [1 0 0]
                                             {:max-steps 1}))))
   (testing "Starting inside counts as an immediate hit, not an exit search"
-    (let [hit (march/raymarch scene/default-scene [10 0 0] [1 0 0])]
+    (let [hit (march/raymarch single-sphere [10 0 0] [1 0 0])]
       (is (= :hit (:status hit)))
       (is (zero? (:distance hit))))))
 
@@ -47,7 +49,8 @@
   ;; Skip a narrow silhouette band because marching uses a surface tolerance.
   (doseq [[width height] [[61 41] [41 61]]
           center [[10 0 0] [10 1 1]]]
-    (let [picture (render/render-image width height {:scene-distance (scene/sphere center 2)})]
+    (let [picture (render/render-image width height {:scene-distance (scene/sphere center 2)
+                                                  :color-fn render/silhouette-color})]
       (is (= [width height] [(.getWidth picture) (.getHeight picture)]))
       (doseq [y (range height), x (range width)]
         (let [rd (camera/ray-direction camera/default-camera x y width height)

@@ -106,6 +106,41 @@ Future exploration goals include somewhat realistic black holes, fractals, wormh
 - There is no collision detection. Moving inside the sphere retains the existing immediate-hit behavior, and magenta silhouette pixels can still indicate unresolved step-limit rays.
 - The scene still uses flat colors. Surface normals and basic lighting remain the suggested next rendering milestone, followed by additional geometry and parallel pixel rendering.
 
+## 2026-10-26 — Milestone 4: surface normals and diffuse lighting
+
+### Implemented and decisions
+
+- Added one world-space directional light and diffuse shading to the sphere. The unit light vector points from the surface toward the light, using the normalized direction `[-0.6, 0.8, -0.5]`.
+- Estimated outward normals with six central-difference samples of the scene distance function, rather than hard-coding sphere normals. The sampling step is configurable and defaults to 0.001 world units. A zero gradient receives ambient fill only.
+- Used Lambert-style diffuse lighting by default: `diffuse = clamp(dot(n,l), 0, 1)`, then `brightness = 0.08 + 0.92 * diffuse`. The small constant ambient term approximates surrounding illumination; it does not simulate light bounces.
+- Implemented the proposed alternative `clamp(dot(n,l)*0.5+0.5, 0, 1)` as an optional half-Lambert-style remap. Both models use the same light, base color, and ambient fill, making their angular response directly comparable. The alternative does not add the optional square used in some variants.
+- Chose Lambert-style shading as the default because surfaces facing away receive no direct light. The ambient fill stays independently adjustable, and future shadow visibility can affect the direct term separately.
+- Calculated lighting in linear RGB and encoded the result to sRGB for display. The base color is decoded once per image; out-of-range output channels are clamped. No HDR/tone mapping was added.
+- Kept all shading in a separate lighting namespace. The marcher still returns hit information independently of lighting, camera, and display. An explicit color function still overrides default shading.
+- Added `--lighting lambert`, `--lighting half-lambert`, and `--lighting flat` for both the interactive viewer and PNG exports. Flat mode preserves the previous geometry-only appearance. Lighting selection is at launch, not a live toggle.
+
+### Verification
+
+- `clojure -M:test`: 14 tests, 10,307 assertions, zero failures/errors. Added checks against analytic sphere normals and a plane normal, angular response at front/side/back orientations, ambient-only fill, undefined normals, light direction/normalization, sRGB round trips, lit pixels, and lighting-option validation.
+- Retained the analytic ray–sphere image tests with an explicit flat-color function so geometry checks remain independent of shading.
+- Exported and visually inspected the lit sphere and a side-by-side comparison of Lambert and the proposed remap. The comparison uses identical scene/light/fill settings and a narrower 35-degree camera view to show the shading clearly.
+- Confirmed the flat-mode PNG checksum exactly matches the previous MVP output.
+- Verified the actual desktop viewer with lighting: mouse dragging changed the image, movement and vertical controls worked, reset restored the view, full-resolution rendering resumed after movement, and closing the viewer stopped its renderer thread. Image calculations remained outside Swing's event dispatch thread.
+
+### Limitations and next steps
+
+- No cast shadows, specular highlights, reflections, distance falloff, multiple lights, or simulated indirect illumination yet. The current directional light has constant direction and strength everywhere.
+- Normal estimation adds six distance samples per shaded hit. Small geometry, fine fractal detail, and non-smooth joins may need different sampling steps or normal methods.
+- Existing step-limit markers remain magenta and can appear along grazing silhouettes. Starting inside geometry retains the marcher's existing immediate-hit policy.
+- Next suggested lighting milestone: shadow rays, then a floor or second object so cast shadows can be evaluated. Material and light settings can evolve independently of the single-ray marcher.
+
+## 2026-10-26 — Valve half-Lambert lighting option
+
+- Added `--lighting valve-half-lambert` alongside `lambert`, `half-lambert`, and `flat` for the interactive viewer and PNG output.
+- Implemented `wrapped = clamp(dot(n,l)*0.5+0.5, 0, 1)` followed by `diffuse = wrapped*wrapped`. The ambient fill, diffuse strength, light, and base color use the same settings as the other lit modes. Standard Lambert remains the default.
+- Verification: 14 tests, 10,313 assertions, zero failures/errors. Checked Valve's angular response at five orientations and CLI acceptance of the new option. Successfully exported and visually inspected a PNG using the new command-line mode.
+- Existing lighting limitations remain: no cast shadows or ambient occlusion yet. The new mode changes only the diffuse angular response.
+
 ## Future entry checklist
 
 For each session, record the date, objective, completed changes, reasons for decisions, checks and results, unresolved issues, and next steps. Focus on rendering development; omit repository housekeeping and editorial changes. Include measured performance only after actual runs, with settings and machine context.

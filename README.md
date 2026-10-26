@@ -10,7 +10,7 @@ Install a JDK (17 or newer) and the Clojure CLI. From this repository's root:
 clojure -M:run
 ```
 
-The first run downloads Clojure and its dependencies. A window displays an orange sphere silhouette on a dark background. The camera is at `(0, 0, 0)`, looks along **+X**, and sees a sphere centered at `(10, 0, 0)` with radius `2`. The camera uses +Y as up and a 60° vertical field of view. This is a real 3D distance-field calculation with flat colors; lighting has not been added yet.
+The first run downloads Clojure and its dependencies. A window displays an orange sphere with matte lighting on a dark background. The camera is at `(0, 0, 0)`, looks along **+X**, and sees a sphere centered at `(10, 0, 0)` with radius `2`. The camera uses +Y as up and a 60° vertical field of view. The surface normal is estimated from the scene distance field and shaded using one directional light plus a small ambient fill.
 
 Image dimensions are configurable independently of the window size. The image scales to fit the window while keeping its aspect ratio; resizing the window does not change the render resolution.
 
@@ -43,7 +43,22 @@ Movement follows camera heading but stays horizontal even when looking up or dow
 
 During movement the viewer requests previews with a maximum dimension of 240 pixels, scaled to fit the window. After 250 ms without camera changes it requests the configured full resolution. One background worker processes the latest pending view; previews may briefly lag the current camera, while obsolete full renders are cancelled. Actual refresh speed depends on scene cost and hardware; this is not a fixed-frame-rate renderer. The status line identifies preview/full resolution and the camera position used for the displayed image.
 
-PNG export remains a single render from the original camera, without opening the interactive window.
+PNG export uses the original camera, without opening the interactive window.
+
+## Lighting
+
+The default is Lambert-style diffuse lighting with a small ambient fill. The world-space light direction points toward `[-0.6, 0.8, -0.5]`; the normal and light direction are unit vectors. Lighting is calculated in linear RGB and encoded to sRGB for display.
+
+```sh
+clojure -M:run --lighting lambert
+clojure -M:run --lighting half-lambert
+clojure -M:run --lighting valve-half-lambert
+clojure -M:run --lighting flat
+```
+
+The alternative uses the proposed `clamp(dot(n,l)*0.5+0.5, 0, 1)` remap with the same ambient fill. The `valve-half-lambert` mode squares that remapped diffuse term before applying the same ambient fill. Flat mode preserves the earlier silhouette for comparison. Modes are selected at launch and also work with `--output`.
+
+See [lighting.md](docs/lighting.md) for the formulas, normal estimation, differences between the models, and configurable lighting settings. There are no cast shadows or simulated light bounces yet.
 
 ## Project organization
 
@@ -52,7 +67,8 @@ PNG export remains a single render from the original camera, without opening the
 - `src/ray_marcher/scene.clj`: sphere distance function and scene union.
 - `src/ray_marcher/march.clj`: independent single-ray marcher.
 - `src/ray_marcher/camera.clj`: perspective camera and pixel ray directions.
-- `src/ray_marcher/render.clj`: sequential image rendering and flat colors.
+- `src/ray_marcher/render.clj`: sequential image rendering.
+- `src/ray_marcher/lighting.clj`: distance-field normals, diffuse shading, and color conversion.
 - `src/ray_marcher/image.clj`: PNG output.
 - `src/ray_marcher/controls.clj`: camera movement and mouse-look calculations.
 - `src/ray_marcher/worker.clj`: background rendering with one pending view.
@@ -69,9 +85,9 @@ The renderer creates a completed image that the existing window displays. The wi
 
 Results distinguish `:hit`, `:miss` (travel limit), and `:step-limit` (unresolved). Hits include the position; all results include distance traveled/bounded and number of evaluations. Starting inside an object counts as an immediate hit. The marcher expects valid settings and a unit direction. Scene functions must return exact signed distances or safe distance bounds; arbitrary implicit equations are not automatically valid inputs.
 
-The renderer casts one ray through each pixel center and accounts for image aspect ratio. Orange means a hit, dark blue means a miss, and magenta means the step budget was exhausted. Near a silhouette, the finite surface tolerance can slightly expand the apparent shape. Rendering is sequential, with no antialiasing, shadows, or lighting yet. A sphere with flat color naturally appears as a circle.
+The renderer casts one ray through each pixel center and accounts for image aspect ratio. Shaded orange means a hit, dark blue means a miss, and magenta means the step budget was exhausted. Near a silhouette, the finite surface tolerance can slightly expand the apparent shape. Pixel rendering is sequential, with no antialiasing, cast shadows, or reflections yet.
 
-`render-image` accepts an optional map with `:scene-distance`, `:camera`, `:settings`, and `:color-fn`. Scene construction and camera setup happen independently of the marcher. A future lighting function can use the hit position and scene distance function to estimate a normal and cast shadow rays. An optional `:cancelled?` predicate is checked between image rows; cancellation returns `nil`. The viewer uses this to abandon obsolete full-resolution frames. Pixel calculations remain sequential within each frame; background rendering does not yet use multiple CPU cores for a single image.
+`render-image` accepts an optional map with `:scene-distance`, `:camera`, `:settings`, and `:color-fn`. Scene construction and camera setup happen independently of the marcher. The default lighting function uses the hit position and scene distance function to estimate an outward normal. Shadow rays remain future work. An optional `:cancelled?` predicate is checked between image rows; cancellation returns `nil`. The viewer uses this to abandon obsolete full-resolution frames. Pixel calculations remain sequential within each frame; background rendering does not yet use multiple CPU cores for a single image.
 
 ## Verification
 
@@ -79,4 +95,4 @@ The renderer casts one ray through each pixel center and accounts for image aspe
 clojure -M:test
 ```
 
-Tests cover known sphere distances, a center hit at `(8, 0, 0)`, misses, travel and step limits, starting inside a sphere, camera directions, and image pixels checked against an independent analytic ray–sphere intersection calculation. Both portrait and landscape images and an off-center sphere are checked. Additional tests check movement speed, horizontal travel while tilted, diagonal normalization, pitch limits, cancellation, and replacement of pending views. Tests require no graphical desktop.
+Tests cover known sphere distances, a center hit at `(8, 0, 0)`, misses, travel and step limits, starting inside a sphere, camera directions, and image pixels checked against an independent analytic ray–sphere intersection calculation. Both portrait and landscape images and an off-center sphere are checked. Lighting tests check normals against known geometry, front/side/back illumination, ambient fill, color conversion, and the rendered light direction. Additional tests check movement speed, horizontal travel while tilted, diagonal normalization, pitch limits, cancellation, and replacement of pending views. Tests require no graphical desktop.
