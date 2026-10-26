@@ -14,19 +14,26 @@
     :step-limit 0xFF00FF))
 
 (defn render-image
-  "One ray per pixel. Scene, camera, marching settings, and coloring are replaceable.
+  "One ray per pixel. Returns nil if cancelled? becomes true between rows.
+  Scene, camera, marching settings, and coloring are replaceable.
   Magenta marks a ray that exhausted its step budget, rather than a proven miss."
   ([width height]
    (render-image width height {}))
-  ([width height {:keys [scene-distance camera settings color-fn]
+  ([width height {:keys [scene-distance camera settings color-fn cancelled?]
                  :or {scene-distance scene/default-scene
                       camera camera/default-camera
                       settings march/default-settings
-                      color-fn silhouette-color}}]
+                      color-fn silhouette-color
+                      cancelled? (constantly false)}}]
    (let [image (BufferedImage. width height BufferedImage/TYPE_INT_RGB)]
-     (dotimes [y height]
-       (dotimes [x width]
-         (let [direction (camera/ray-direction camera x y width height)
-               result (march/raymarch scene-distance (:origin camera) direction settings)]
-           (.setRGB image x y (int (color-fn result))))))
-     image)))
+     (loop [y 0]
+       (cond
+         (cancelled?) nil
+         (= y height) image
+         :else
+         (do
+           (dotimes [x width]
+             (let [direction (camera/ray-direction camera x y width height)
+                   result (march/raymarch scene-distance (:origin camera) direction settings)]
+               (.setRGB image x y (int (color-fn result)))))
+           (recur (inc y))))))))

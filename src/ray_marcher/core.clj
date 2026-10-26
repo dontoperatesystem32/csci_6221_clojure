@@ -1,5 +1,5 @@
 (ns ray-marcher.core
-  "Application entry point. Generates an image before asking Swing to display it."
+  "Application entry point: interactive window or a single PNG export."
   (:require [ray-marcher.image :as image]
             [ray-marcher.render :as render]
             [ray-marcher.ui :as ui]))
@@ -32,10 +32,9 @@
     (let [{:keys [width height output help?]} (parse-options args)]
       (if help?
         (println usage)
-        (let [picture (render/render-image width height)]
-          (if output
-            (println "Saved" (.getAbsolutePath (image/save-png! picture output)))
-            (ui/show-image! picture)))))
+        (if output
+          (println "Saved" (.getAbsolutePath (image/save-png! (render/render-image width height) output)))
+          (ui/show-viewer! width height render/render-image))))
     (catch Exception e
       (binding [*out* *err*]
         (println "Could not start:" (.getMessage e))
