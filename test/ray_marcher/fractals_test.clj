@@ -51,3 +51,42 @@
     (is (= [-1 6 -9] (:position camera-state)))
     (is (= 512 (get-in render-options [:settings :max-steps])))
     (is (pos? ((:scene-distance render-options) [10 0 0])))))
+
+(deftest mandelbulb-known-polar-orbits
+  ;; Along +Y, the spherical power becomes the real recurrence y <- y^power + c.
+  ;; c=2 escapes after one step, giving a closed-form radius and derivative.
+  (doseq [power [2 4 8 16]]
+    (let [bulb (fractals/mandelbulb [0 0 0] 1 {:power power})
+          escaped (+ (Math/pow 2 power) 2)
+          derivative (+ (* power (Math/pow 2 (dec power))) 1)
+          expected (* 0.7 0.5 (Math/log escaped) (/ escaped derivative))]
+      (is (< (Math/abs (- expected (bulb [0 2 0]))) 1.0e-9))))
+  (let [bulb (fractals/mandelbulb [0 0 0] 1)]
+    (is (zero? (bulb [0 0 0])))
+    (is (zero? (bulb [0 -1 0])))
+    (is (< (Math/abs (- (* 0.7 98) (bulb [100 0 0]))) 1.0e-9))))
+
+(deftest mandelbulb-finite-symmetry-and-scale
+  (let [bulb (fractals/mandelbulb [0 0 0] 1)
+        larger (fractals/mandelbulb [10 2 -1] 2.5)]
+    (doseq [x [-2 -1 -0.01 0 0.01 1 2]
+            y [-1.5 0 1.5]
+            z [-1.5 0 1.5]]
+      (let [distance (bulb [x y z])]
+        (is (and (Double/isFinite distance) (not (neg? distance))))))
+    (doseq [p [[0.8 0.4 0.6] [1.5 -0.3 0.7] [0 2 0]]]
+      (let [[x y z] p]
+        (is (< (Math/abs (- (bulb p) (bulb [x y (- z)]))) 1.0e-9))
+        (is (< (Math/abs (- (* 2.5 (bulb p))
+                            (larger (v/add [10 2 -1] (v/scale p 2.5))))) 1.0e-9))))))
+
+(deftest mandelbulb-rays-validation-and-scene
+  (let [bulb (fractals/mandelbulb [0 0 0] 1)]
+    (is (= :hit (:status (march/raymarch bulb [0 3 0] [0 -1 0] {:max-steps 768}))))
+    (is (= :miss (:status (march/raymarch bulb [0 -3 0] [0 -1 0] {:max-distance 20}))))
+    (doseq [options [{:power 1} {:iterations 0} {:bailout 1} {:step-factor 0} {:step-factor 1.1}]]
+      (is (thrown? clojure.lang.ExceptionInfo (fractals/mandelbulb [0 0 0] 1 options)))))
+  (is (thrown? clojure.lang.ExceptionInfo (fractals/mandelbulb [0 0 0] 0)))
+  (let [options (:render-options (scene-file/load-scene "scenes/mandelbulb.clj"))]
+    (is (zero? ((:scene-distance options) [10 0 0])))
+    (is (= 0xDDDDDD (get-in options [:lighting :base-color])))))

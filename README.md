@@ -53,6 +53,20 @@ Edit `scenes/menger.clj` to change its camera, color, light, or the depth in `(f
 
 The function evaluates repeated tunnel cuts rather than enumerating individual cubes. It supplies a conservative distance bound; it is a finite approximation of the fractal, with no cast shadows or ambient occlusion yet. More detail increases CPU cost. [Menger sponge construction reference](https://www.cs.utexas.edu/~fussell/courses/cs354/assignments/menger/handout.shtml).
 
+## Mandelbulb scene
+
+The supplied reference image appears to show a power-8 Mandelbulb. A separate pale-gray scene reproduces that fractal family and its upright, layered form:
+
+```sh
+clojure -M:run --scene scenes/mandelbulb.clj --width 800 --height 800
+```
+
+![Mandelbulb](docs/images/mandelbulb.png)
+
+Its exact original parameters cannot be recovered from the image alone. This version uses spherical power 8, 14 escape iterations, a reduced marching step, and wider normal sampling to reduce speckled shading. The reference's floor, soft shadows, and ambient occlusion are not reproduced by the current diffuse-only renderer.
+
+See [mandelbulb.md](docs/mandelbulb.md) for identification, tuning, and distance-estimator limitations.
+
 ## Camera controls
 
 Focus the viewer window to use the keyboard. Hold the left mouse button and drag over the image to look around; release it to stop looking. No system pointer capture is required.
@@ -92,10 +106,11 @@ See [lighting.md](docs/lighting.md) for the formulas, normal estimation, differe
 - `src/ray_marcher/core.clj`: startup and command-line options.
 - `src/ray_marcher/vector.clj`: basic 3D vector operations.
 - `src/ray_marcher/scene.clj`: sphere, cube, box, and scene union.
-- `src/ray_marcher/fractals.clj`: finite Menger sponge distance bounds.
+- `src/ray_marcher/fractals.clj`: Menger sponge distance bounds and Mandelbulb exterior estimates.
 - `src/ray_marcher/scene_file.clj`: scene loading, validation, and camera preparation.
 - `scenes/example.clj`: editable custom-scene example.
 - `scenes/menger.clj`: framed and lit Menger sponge scene.
+- `scenes/mandelbulb.clj`: pale-gray Mandelbulb matching the reference's fractal family.
 - `src/ray_marcher/march.clj`: independent single-ray marcher.
 - `src/ray_marcher/camera.clj`: perspective camera and pixel ray directions.
 - `src/ray_marcher/render.clj`: sequential image rendering.

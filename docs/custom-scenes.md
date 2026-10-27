@@ -134,6 +134,14 @@ To use the shape in your own scene, add `[ray-marcher.fractals :as fractals]` to
 
 Arguments are center, full side length, and depth (0–6). The supplied scene is currently set to depth 5 (the saved preview shows depth 3), a smaller hit tolerance and normal step of 0.0005, and a 512-step budget. Lower depth to 2 for less CPU work; higher depth needs finer sampling and more pixels to show additional detail. This is a finite signed distance bound, not an infinitely detailed object or an exact distance everywhere.
 
+For a more organic fractal, load the separate Mandelbulb scene:
+
+```sh
+clojure -M:run --scene scenes/mandelbulb.clj --width 800 --height 800
+```
+
+It uses `fractals/mandelbulb`, an approximate exterior estimator whose non-escaping interior points return zero. Its scene includes a local-coordinate reflection to orient the shape like the reference image. See [mandelbulb.md](mandelbulb.md) for constructor arguments, tuning, and the limits of using this estimate in signed shape operations.
+
 ## 7. Define a new shape with code
 
 You can provide your own signed-distance functions rather than being limited to the constructors. For example, a horizontal floor at Y = -2 has signed distance `y + 2`:

@@ -199,6 +199,30 @@ Future exploration goals include somewhat realistic black holes, fractals, wormh
 - Ran an actual terminal export and redirected 960 × 720 fractal exports. Verified zero-to-100-percent row reporting, the writing phase, and clean stdout. A temporary depth-3 scene copy produced a PNG checksum identical to the original depth-3 preview; the current depth-5 scene setting was preserved.
 - Limitation: percentage describes completed rows rather than predicted time; rows crossing detailed geometry can take longer. PNG encoding has a status message rather than its own measured percentage. Progress is currently synchronous with the sequential renderer.
 
+## 2026-10-26 — Milestone 7: reference-inspired Mandelbulb scene
+
+### Implemented and decisions
+
+- Identified the supplied image as appearing to show a Mandelbulb, likely spherical power 8. The exact original parameters cannot be recovered from the screenshot alone.
+- Added `fractals/mandelbulb`, with configurable center, scale, power, escape iterations, bailout radius, and step factor. It uses spherical-power escape iteration and the derivative-based exterior distance estimate described in the linked references.
+- Handled zero-radius orbits without division by zero. Far outside the fractal, used its radius-2 bounding sphere to avoid excessively long logarithmic steps. Near the surface the estimator remains approximate, not a proven conservative bound.
+- Non-escaping points return zero rather than a negative signed interior distance. This supports the existing hit test but is not a general signed-distance primitive for subtraction/intersection operations.
+- Added `scenes/mandelbulb.clj` using power 8, 14 escape iterations, scale 2.5, and a 0.7 step factor. A local Y reflection places the spire above the layered base, and the model is translated to world `[10 0 0]`.
+- Used a pale-gray material and directional light. Tuned hit tolerance to 0.0015 and normal sampling to 0.008 to reduce speckled shading while retaining the larger surface ridges. The scene has a 768-step marching budget and its own camera.
+- Added a rendered 800 × 800 preview and a Mandelbulb guide covering identification, tuning, formula references, and estimator limitations. The default and Menger scenes remain separate.
+
+### Verification
+
+- `clojure -M:test`: 29 tests, 10,743 assertions, zero failures/errors. Added closed-form checks of positive polar-axis escape orbits for powers 2, 4, 8, and 16; bounded center/negative-pole cases; finite nonnegative samples; reflection symmetry; world scaling/translation; ray hits/misses; option validation; and scene loading.
+- Rendered and visually compared multiple previews while tuning orientation and normal sampling, then exported and inspected the final 800 × 800 image. The PNG progress bar reached completion and its writing phase successfully.
+- Verified that the desktop viewer loaded the configured camera, rendered outside Swing's event dispatch thread, and produced preview and full-resolution frames after mouse-look movement.
+
+### Limitations and next steps
+
+- This reproduces the reference's apparent fractal family and overall orientation, not its exact parameters or image. The reference's gray ground, soft contact shadows, and ambient occlusion are not reproduced by the current diffuse-only scene.
+- Finite iterations, hit tolerance, and normal smoothing limit visible detail. Higher resolution and tighter settings increase CPU cost; no antialiasing or exact interior distance was added.
+- Shadows and ambient occlusion remain useful next improvements, particularly for the fractal's recesses and contact with future supporting geometry.
+
 ## Future entry checklist
 
 For each session, record the date, objective, completed changes, reasons for decisions, checks and results, unresolved issues, and next steps. Focus on rendering development; omit repository housekeeping and editorial changes. Include measured performance only after actual runs, with settings and machine context.
