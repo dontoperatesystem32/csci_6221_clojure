@@ -14,3 +14,5 @@ pom.xml.asc
 .cpcache/
 .codex-build/
 .DS_Store
+/.clj-kondo/.cache/
+/.lsp/.cache/
