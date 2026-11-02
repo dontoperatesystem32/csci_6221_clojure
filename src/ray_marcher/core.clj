@@ -33,6 +33,7 @@
           "--output" (if (or (nil? value) (.startsWith ^String value "--"))
                        (throw (ex-info "--output requires a file path." {}))
                        (recur remaining (assoc options :output value)))
+          "--threads" (recur remaining (assoc options :threads (positive-dimension flag value)))
           (throw (ex-info (str "Unknown option: " flag) {})))))))
 
 (defn configure-lighting
@@ -45,14 +46,16 @@
 
 (defn -main [& args]
   (try
-    (let [{:keys [width height output help? lighting scene]} (parse-options args)]
+    (let [{:keys [width height output help? lighting scene threads]} (parse-options args)]
       (if help?
         (println usage)
         (let [{:keys [render-options camera-state]}
               (if scene (scene-file/load-scene scene) (scene-file/default-scene))
               configured (configure-lighting render-options lighting)
               render-view (fn [w h options]
-                            (render/render-image w h (merge configured options)))]
+                            (render/render-image w h (merge configured options)))
+              render-viewer (fn [w h options]
+                              (render/render-pixels w h (merge configured options)))]
           (if output
             (let [{:keys [report! writing! finish!]} (progress/reporter)
                   file (try
@@ -61,7 +64,7 @@
                            (image/save-png! picture output))
                          (finally (finish!)))]
               (println "Saved" (.getAbsolutePath file)))
-            (ui/show-viewer! width height render-view camera-state)))))
+            (ui/show-viewer! width height render-viewer camera-state threads)))))
     (catch Exception e
       (binding [*out* *err*]
         (println "Could not start:" (.getMessage e))

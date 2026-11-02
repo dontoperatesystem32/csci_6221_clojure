@@ -17,8 +17,8 @@
   "Open an interactive viewer. render-fn is independent of Swing and accepts
   width, height, and rendering options. Drag the left mouse button to look."
   ([width height render-fn]
-   (show-viewer! width height render-fn controls/initial-state))
-  ([width height render-fn initial-state]
+   (show-viewer! width height render-fn controls/initial-state 1))
+  ([width height render-fn initial-state threads]
   (when (GraphicsEnvironment/isHeadless)
     (throw (ex-info "A graphical desktop is required. Use --output preview.png instead." {})))
   (SwingUtilities/invokeLater
@@ -54,7 +54,7 @@
                        (swap! revision inc)
                        (reset! changed-at (System/nanoTime))))
            clear-input! #(do (reset! held #{}) (reset! drag nil))
-           renderer (worker/start!
+           renderer (worker/start-multi!
                      {:render-fn render-fn
                       :on-image
                       (fn [{:keys [preview? valid? camera]} image]
@@ -73,7 +73,8 @@
                       (fn [_ error]
                         (SwingUtilities/invokeLater
                          #(when-not @closed?
-                            (.setText status (str "Rendering failed: " (.getMessage ^Exception error))))))})
+                            (.setText status (str "Rendering failed: " (.getMessage ^Exception error))))))
+                      :threads (if (= threads nil) 1 threads)})
            dispatcher
            (reify KeyEventDispatcher
              (dispatchKeyEvent [_ event]

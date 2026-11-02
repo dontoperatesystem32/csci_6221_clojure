@@ -41,3 +41,42 @@
                (.setRGB image x y (int (shade result)))))
            (when on-progress (on-progress (inc y) height))
            (recur (inc y))))))))
+
+(defn pixels-to-image [width height pixels]
+  (let [image (BufferedImage. width height BufferedImage/TYPE_INT_RGB)
+        java-array (int-array pixels)]
+    (.setRGB image 0 0 width height java-array 0 width)
+    image))
+
+(defn render-pixels
+  "One ray per pixel. Optional on-progress receives completed rows and total rows.
+  Returns nil if cancelled? becomes true between rows.
+  Scene, camera, marching settings, and coloring are replaceable.
+  Magenta marks a ray that exhausted its step budget, rather than a proven miss."
+  ([width height]
+   (render-pixels width height {}))
+  ([width height {:keys [scene-distance camera settings color-fn cancelled? lighting on-progress threads thread-idx]
+                  :or {scene-distance scene/default-scene
+                       camera camera/default-camera
+                       settings march/default-settings
+                       cancelled? (constantly false)
+                       threads 1
+                       thread-idx 1}}]
+   (let [shade (or color-fn (lighting/make-shader scene-distance lighting))
+         height-div (max 1 (/ height threads))
+         max-height (if (= thread-idx threads) height (* thread-idx height-div))
+         min-height (* height-div (- thread-idx 1))]
+     (loop [y min-height
+            pixels []] 
+       (if (or (cancelled?) (>= y max-height))
+         (if (>= y max-height) pixels
+             nil)
+         (recur
+          (inc y)
+          (loop [x 0
+                 x_pixels pixels]
+            (if (>= x width)
+              x_pixels
+              (recur
+               (inc x)
+               (conj x_pixels (int (shade (march/raymarch scene-distance (:origin camera) (camera/ray-direction camera x y width height) settings)))))))))))))

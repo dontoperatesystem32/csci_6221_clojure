@@ -28,6 +28,16 @@ PNG exports show a live terminal progress bar with percentage and completed rows
 
 The destination directory must already exist. Use `clojure -M:run --help` for options. This milestone does not impose a practical image-size cap; very large dimensions can exhaust memory.
 
+## Multithreading
+
+To render using multiple threads in a window, use
+
+```sh
+clojure -M:run --threads 16
+```
+
+Note that multithreading is not enabled for rendering a single image.
+
 ## Custom scenes
 
 Load your own geometry, camera, lighting, and marching settings from a Clojure file:
