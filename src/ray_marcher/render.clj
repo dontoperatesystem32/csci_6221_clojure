@@ -14,13 +14,13 @@
     :miss 0x101A2B
     :step-limit 0xFF00FF))
 
-(defn render-image
+(defn render-image-sync
   "One ray per pixel. Optional on-progress receives completed rows and total rows.
   Returns nil if cancelled? becomes true between rows.
   Scene, camera, marching settings, and coloring are replaceable.
   Magenta marks a ray that exhausted its step budget, rather than a proven miss."
   ([width height]
-   (render-image width height {}))
+   (render-image-sync width height {}))
   ([width height {:keys [scene-distance camera settings color-fn cancelled? lighting on-progress]
                  :or {scene-distance scene/default-scene
                       camera camera/default-camera
@@ -41,6 +41,20 @@
                (.setRGB image x y (int (shade result)))))
            (when on-progress (on-progress (inc y) height))
            (recur (inc y))))))))
+
+(defn multi-render
+  [render-fn width height info]
+  (loop [threads (get info :threads 1)
+         thread-idx 1
+         pixels []
+         queued-futures (loop [thread-idx 1
+                               futures []]
+                          (if (> thread-idx threads)
+                            futures
+                            (recur (inc thread-idx) (conj futures (future (render-fn width height (assoc info :thread-idx thread-idx)))))))]
+    (if (> thread-idx threads)
+      pixels
+      (recur threads (inc thread-idx) (into pixels (deref (let [[head & _] queued-futures] head))) (let [[_ & tail] queued-futures] tail)))))
 
 (defn pixels-to-image [width height pixels]
   (let [image (BufferedImage. width height BufferedImage/TYPE_INT_RGB)
@@ -80,3 +94,12 @@
               (recur
                (inc x)
                (conj x_pixels (int (shade (march/raymarch scene-distance (:origin camera) (camera/ray-direction camera x y width height) settings)))))))))))))
+
+(defn render-image
+  ([width height]
+   (render-image width height {}))
+  ([width height info]
+   (if (= 1 (get info :threads 1))
+     (render-image-sync width height)
+     (pixels-to-image width height (multi-render render-pixels width height info)))
+   ))

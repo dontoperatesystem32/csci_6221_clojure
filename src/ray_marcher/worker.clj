@@ -1,7 +1,6 @@
 (ns ray-marcher.worker
   "One background renderer, one replaceable pending view. No Swing dependencies."
-  (:import [java.util.concurrent ArrayBlockingQueue Executors ExecutorService ThreadFactory])
-  (:require [ray-marcher.render :as render]))
+  (:import [java.util.concurrent ArrayBlockingQueue Executors ExecutorService ThreadFactory]))
 
 (defn start!
   "render-fn receives width, height, and options with :camera and :cancelled?.
@@ -42,25 +41,6 @@
                (.clear queue)
                (.shutdownNow ^ExecutorService executor))}))
 
-(defn multi-render
-  [render-fn width height camera cancelled? threads]
-    (loop [
-           thread-idx 1
-           pixels []
-           queued-futures (loop [thread-idx 1
-                                 futures []]
-                            (if (> thread-idx threads)
-                              futures
-                              (recur (inc thread-idx) (conj futures (future (render-fn width height
-                                                                                       {:camera camera
-                                                                                        :cancelled? cancelled?
-                                                                                        :threads threads
-                                                                                        :thread-idx thread-idx}))))))]
-      (if (> thread-idx threads)
-        pixels
-        (recur (inc thread-idx) (into pixels (deref (let [[head & _] queued-futures] head
-                                                     ))) (let [[_ & tail] queued-futures] tail)))))
-
 
 (defn start-multi!
   "render-fn receives width, height, and options with :camera and :cancelled?.
@@ -84,8 +64,8 @@
                                           (and (not preview?) (not (valid?))))]
                       (try
                         (when-not (cancelled?)
-                          (when-let [pixels (multi-render render-fn width height camera cancelled? threads)]
-                            (when-not (cancelled?) (on-image request (render/pixels-to-image width height pixels)))))
+                          (when-let [image (render-fn width height {:camera camera :cancelled? cancelled? :threads threads})]
+                            (when-not (cancelled?) (on-image request image))))
                         (catch Exception e
                           (when-not (cancelled?) (on-error request e))))))
                   (catch InterruptedException _ nil))))

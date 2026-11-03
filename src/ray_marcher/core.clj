@@ -53,9 +53,7 @@
               (if scene (scene-file/load-scene scene) (scene-file/default-scene))
               configured (configure-lighting render-options lighting)
               render-view (fn [w h options]
-                            (render/render-image w h (merge configured options)))
-              render-viewer (fn [w h options]
-                              (render/render-pixels w h (merge configured options)))]
+                            (render/render-image w h (merge configured options)))]
           (if output
             (let [{:keys [report! writing! finish!]} (progress/reporter)
                   file (try
@@ -64,7 +62,7 @@
                            (image/save-png! picture output))
                          (finally (finish!)))]
               (println "Saved" (.getAbsolutePath file)))
-            (ui/show-viewer! width height render-viewer camera-state threads)))))
+            (ui/show-viewer! width height render-view camera-state threads)))))
     (catch Exception e
       (binding [*out* *err*]
         (println "Could not start:" (.getMessage e))
