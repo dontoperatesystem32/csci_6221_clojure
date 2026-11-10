@@ -16,7 +16,7 @@
     (int n)))
 
 (defn parse-options [args]
-  (loop [args (seq args), options {:width 800 :height 450}]
+  (loop [args (seq args), options {:width 800 :height 450 :threads 1}]
     (if-not args
       options
       (let [[flag value & remaining] args]
@@ -57,11 +57,12 @@
           (if output
             (let [{:keys [report! writing! finish!]} (progress/reporter)
                   file (try
-                         (let [picture (render-view width height {:on-progress report!})]
+                         (let [picture (render-view width height {:on-progress report! :threads threads})]
                            (writing!)
                            (image/save-png! picture output))
                          (finally (finish!)))]
-              (println "Saved" (.getAbsolutePath file)))
+              (println "Saved" (.getAbsolutePath file))
+              (System/exit 1))
             (ui/show-viewer! width height render-view camera-state threads)))))
     (catch Exception e
       (binding [*out* *err*]
