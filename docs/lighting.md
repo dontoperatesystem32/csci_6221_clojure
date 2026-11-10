@@ -92,6 +92,18 @@ Lighting is calculated in linear RGB, then converted back to sRGB for display. S
 
 The lighting module has no camera or Swing dependencies. The marcher still only finds hit information. Each shaded hit adds six scene-distance evaluations for its normal; it does not cast shadow rays.
 
+## Ambient occlusion
+
+Optional normal-sampled AO scales only the ambient contribution:
+
+```text
+brightness = ambient * accessibility + diffuseStrength * diffuse
+```
+
+Enable it with `--ao normal`, inspect grayscale accessibility with `--ao only`, or disable it with `--ao off`. Default mode is off unless a scene enables it. Scene settings live in `:lighting {:ao {...}}`. The same scene field supplies normals and AO probes, including when smooth unions are used. Direct diffuse remains unchanged; flat/custom coloring bypasses AO.
+
+See [ambient-occlusion.md](ambient-occlusion.md) for configuration, derivation, the step-count counterexample, and limitations. Enabled AO adds the configured number of scene-distance probes per valid shaded hit. It does not simulate light bouncing or directional-light visibility.
+
 ## References
 
 - [Physically Based Rendering: Diffuse Reflection](https://pbr-book.org/4ed/Reflection_Models/Diffuse_Reflection): matte reflection and the cosine factor in light transport.

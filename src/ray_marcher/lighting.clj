@@ -1,6 +1,7 @@
 (ns ray-marcher.lighting
   "Distance-field normals and simple matte directional lighting, independent of UI."
-  (:require [ray-marcher.vector :as v]))
+  (:require [ray-marcher.vector :as v]
+            [ray-marcher.ao :as ao]))
 
 (def default-settings
   {:toward-light [-0.6 0.8 -0.5]
@@ -8,7 +9,8 @@
    :diffuse-strength 0.92
    :normal-step 0.001
    :base-color 0xF5AC48
-   :diffuse-model :lambert})
+   :diffuse-model :lambert
+   :ao ao/default-settings})
 
 (defn surface-normal
   "Estimate the outward gradient with six central-difference distance samples.
@@ -54,7 +56,9 @@
   The ambient term is an artistic fill, not simulated indirect illumination."
   ([scene-distance] (make-shader scene-distance {}))
   ([scene-distance settings]
-   (let [{:keys [toward-light ambient diffuse-strength normal-step base-color diffuse-model]}
+   (let [ao-settings (ao/settings (get settings :ao {}))
+         accessibility (ao/make-accessibility scene-distance ao-settings)
+         {:keys [toward-light ambient diffuse-strength normal-step base-color diffuse-model]}
          (merge default-settings settings)
          light (v/normalize toward-light)
          base (mapv #(srgb-to-linear (bit-and 255 (bit-shift-right base-color %))) [16 8 0])]
@@ -71,6 +75,9 @@
                ;; should invent a direction-dependent contribution.
                diffuse (if (zero? (v/length normal)) 0.0
                            (diffuse-factor normal light diffuse-model))
-               brightness (+ ambient (* diffuse-strength diffuse))
-               [r g b] (mapv #(linear-to-srgb (* % brightness)) base)]
+               access (accessibility position normal)
+               brightness (+ (* ambient access) (* diffuse-strength diffuse))
+               [r g b] (if (= :only (:mode ao-settings))
+                         (vec (repeat 3 (linear-to-srgb access)))
+                         (mapv #(linear-to-srgb (* % brightness)) base))]
            (bit-or (bit-shift-left r 16) (bit-shift-left g 8) b)))))))

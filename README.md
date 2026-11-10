@@ -49,6 +49,18 @@ clojure -M:run --scene scenes/example.clj --lighting valve-half-lambert --output
 
 See the [custom-scene tutorial](docs/custom-scenes.md) for a complete copyable example, coordinate conventions, object sizes, and how to define new distance functions. Scene files are ordinary executable Clojure. Without `--scene`, the built-in sphere-and-cube scene is used. A CLI lighting choice overrides the scene's model while preserving its other lighting settings.
 
+## Ambient occlusion
+
+Use normal-direction distance probes to darken ambient light near contacts and crevices:
+
+```sh
+clojure -M:run --scene scenes/ao-demo.clj --ao normal
+clojure -M:run --scene scenes/ao-demo.clj --ao only
+clojure -M:run --scene scenes/ao-demo.clj --ao off
+```
+
+AO is off by default; the demo enables it. All modes also work for PNG export and threaded rendering. See the [AO guide](docs/ambient-occlusion.md) for sample/radius/strength settings, comparisons, and approximation limits. AO affects ambient fill; directional-light cast shadows remain future work.
+
 ## Distance blending experiments
 
 Try rounding the join between two spheres with either polynomial smooth minimum or exponential softmin:
@@ -73,7 +85,7 @@ clojure -M:run --scene scenes/menger.clj --width 960 --height 720
 
 Edit `scenes/menger.clj` to change its camera, color, light, or the depth in `(fractals/menger-sponge [10 0 0] 6 5)`. The arguments are center, full side length, and subdivision depth. Depth 2 is lighter to render; depth 4 reveals smaller tunnels. Supported depths are 0–6, with 0 producing a solid cube. Finer detail needs tighter hit/normal tolerances and enough image resolution.
 
-The function evaluates repeated tunnel cuts rather than enumerating individual cubes. It supplies a conservative distance bound; it is a finite approximation of the fractal, with no cast shadows or ambient occlusion yet. More detail increases CPU cost. [Menger sponge construction reference](https://www.cs.utexas.edu/~fussell/courses/cs354/assignments/menger/handout.shtml).
+The function evaluates repeated tunnel cuts rather than enumerating individual cubes. It supplies a conservative distance bound; it is a finite approximation of the fractal. The saved preview has no AO or cast shadows; AO can now be enabled separately. More detail increases CPU cost. [Menger sponge construction reference](https://www.cs.utexas.edu/~fussell/courses/cs354/assignments/menger/handout.shtml).
 
 ## Mandelbulb scene
 
@@ -85,7 +97,7 @@ clojure -M:run --scene scenes/mandelbulb.clj --width 800 --height 800
 
 ![Mandelbulb](docs/images/mandelbulb.png)
 
-Its exact original parameters cannot be recovered from the image alone. This version uses spherical power 8, 14 escape iterations, a reduced marching step, and wider normal sampling to reduce speckled shading. The reference's floor, soft shadows, and ambient occlusion are not reproduced by the current diffuse-only renderer.
+Its exact original parameters cannot be recovered from the image alone. This version uses spherical power 8, 14 escape iterations, a reduced marching step, and wider normal sampling to reduce speckled shading. The saved preview does not reproduce the reference's floor, soft shadows, or ambient occlusion. Optional AO can now be enabled, although this approximate fractal estimator needs careful tuning.
 
 See [mandelbulb.md](docs/mandelbulb.md) for identification, tuning, and distance-estimator limitations.
 
@@ -121,7 +133,7 @@ clojure -M:run --lighting flat
 
 The alternative uses the proposed `clamp(dot(n,l)*0.5+0.5, 0, 1)` remap with the same ambient fill. The `valve-half-lambert` mode squares that remapped diffuse term before applying the same ambient fill. Flat mode preserves the earlier silhouette for comparison. Modes are selected at launch and also work with `--output`.
 
-See [lighting.md](docs/lighting.md) for the formulas, normal estimation, differences between the models, and configurable lighting settings. There are no cast shadows or simulated light bounces yet.
+See [lighting.md](docs/lighting.md) for the formulas, normal estimation, differences between the models, and configurable lighting settings. Optional AO attenuates ambient fill; there are no directional-light cast shadows or simulated light bounces yet.
 
 ## Project organization
 
@@ -139,6 +151,8 @@ See [lighting.md](docs/lighting.md) for the formulas, normal estimation, differe
 - `src/ray_marcher/camera.clj`: perspective camera and pixel ray directions.
 - `src/ray_marcher/render.clj`: sequential image rendering.
 - `src/ray_marcher/lighting.clj`: distance-field normals, diffuse shading, and color conversion.
+- `src/ray_marcher/ao.clj`: deterministic normal-sampled ambient occlusion.
+- `scenes/ao-demo.clj`: sphere/cube contacts with a floor for AO comparisons.
 - `src/ray_marcher/image.clj`: PNG output.
 - `src/ray_marcher/progress.clj`: terminal progress reporting for PNG exports.
 - `src/ray_marcher/controls.clj`: camera movement and mouse-look calculations.

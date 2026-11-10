@@ -132,6 +132,12 @@ Flat mode uses the fixed debug silhouette colors. Without `--lighting`, the scen
 
 Increase `:max-steps` if magenta pixels indicate unresolved rays. Increase `:max-distance` when moving geometry farther away. `:epsilon` controls how close a ray must get to count as a hit; it is a positive distance in world units. More steps and tighter tolerances can cost more CPU time.
 
+## Add ambient occlusion
+
+Add `:ao {:mode :normal :samples 5 :radius 1.0 :bias 0.01 :strength 1.0}` inside `:lighting`. AO reduces ambient fill near crowded geometry; it leaves direct diffuse lighting unchanged. The default mode is `:off` unless the scene enables it.
+
+Use `--ao off|normal|only` to override the mode at startup. `only` shows grayscale accessibility for tuning. `--lighting flat` bypasses AO. Try `scenes/ao-demo.clj`; see [ambient-occlusion.md](ambient-occlusion.md) for formulas, examples, costs, and fractal limitations.
+
 ## Fractal example
 
 Load `scenes/menger.clj` for a complete fractal scene:
@@ -172,6 +178,6 @@ You can provide your own signed-distance functions rather than being limited to 
   floor-distance)
 ```
 
-Place the `defn` before the final scene map. The floor extends infinitely in X and Z; points below it are inside its solid half-space. There are still no cast shadows or ambient occlusion, so adding a floor alone will not create contact shadows.
+Place the `defn` before the final scene map. The floor extends infinitely in X and Z; points below it are inside its solid half-space. There are no directional-light cast shadows. Enabling AO can darken ambient light around contacts; adding a floor alone with AO off does not produce contact shading.
 
 The marcher needs signed distances or safe distance estimates: positive outside, zero on the surface, negative inside. An arbitrary formula whose zero describes a surface is not automatically safe for marching. Fractals and other advanced geometry will need appropriate distance estimates; curved light paths and non-Euclidean spaces require additional traversal work beyond defining a new scene file.

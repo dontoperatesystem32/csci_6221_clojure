@@ -268,6 +268,30 @@ This entry fills a documentation gap for implementation commits dated November 2
 - Existing threaded rendering does not report completed rows; use the default single thread for the PNG progress bar. Threaded row scheduling, cancellation, and progress are outside this distance-blending change. No performance benchmark or general threaded-renderer correctness claim is made from the small even-sized comparison.
 - Useful next experiments are sphere/cube joins, controlled width sweeps, and measured render cost with fixed inputs. Preserve group order, scene contents, and all rendering settings when comparing results.
 
+## 2026-11-10 — Normal-sampled ambient occlusion
+
+### Implemented and decisions
+
+- Added a pure `ao` module that samples the scene distance at deterministic positions along the outward surface normal. It compares actual clearance with the distance moved from the hit point, combines normalized deficits with decreasing weights, and returns clamped accessibility from 0 to 1. Probe schedules are prepared once per image.
+- Used local surface clearance instead of the primary ray's evaluation count. Step count changes with view direction, tolerance, and distance-estimator conservativeness, so it cannot reliably describe surrounding visibility. An analytic flat-plane counterexample is now an automated test.
+- Applied accessibility only to ambient fill: `ambient * accessibility + diffuseStrength * diffuse`. Directional diffuse light remains unchanged. Added `--ao off|normal|only`; AO-only displays grayscale accessibility using the existing linear-to-sRGB encoding. Flat/custom coloring bypasses this shader.
+- Added validated scene configuration under `:lighting :ao`: mode, 1–64 samples, positive radius, nonnegative bias, and nonnegative strength, with finite numeric distances/strength. Defaults are off, 5 probes, radius 1, bias 0.01, strength 1. CLI overrides only mode, preserving other scene settings. Disabled AO, zero strength, or an undefined zero normal adds no scene-distance probes.
+- Added `scenes/ao-demo.clj` with sphere/cube contact against a floor and increased ambient contribution for a visible comparison. Added a three-panel off/normal/only image and `docs/ambient-occlusion.md` covering commands, formulas, settings, costs, the step-count counterexample, and approximation limits. Updated README, lighting guide, and custom-scene tutorial.
+- Checked origin before beginning implementation; there were no additional upstream commits to integrate. Rendering remains in Clojure and outside Swing's event dispatch thread; no UI threading changes were needed.
+
+### Verification
+
+- `clojure -M:test`: 37 tests, 11,098 assertions, zero failures/errors. New tests cover open planes/convex spheres, an analytic ceiling probe, closer blockers, bounded output, exact probe counts, disabled/zero-strength/zero-normal paths, ambient-only attenuation, unchanged direct light, independence from hit step count, AO-only pixels, scene loading, CLI overrides, and invalid settings.
+- The plane test uses initial height 1, epsilon 0.00001, and unit ray directions. A straight-down ray hits in 2 distance checks, while a ray with downward component 0.01 takes over 1,000. Both return open accessibility 1, demonstrating why camera-ray step count is unsuitable as AO.
+- Exported the demo at 360 × 270 in off, normal, and only modes, plus a two-thread normal render. All four separate CLI processes exited successfully. Off and normal differ; the two-thread normal PNG is byte-identical to the single-thread normal PNG. Visually inspected the comparison: contact areas darken while open areas remain bright.
+- Existing tests pass with AO off by default. No native-window interaction test or render-speed benchmark was performed; the viewer uses the same shader path and its existing background renderer.
+
+### Limitations and next steps
+
+- This is normal-sampled ambient obscurance, not full hemisphere visibility. It can miss directional blockers or exaggerate local proximity. Conservative bounds and approximate fractal estimators can cause false darkening; AO-only mode helps inspect this. No cast shadows, light bounces, or material blending were introduced.
+- Enabled AO adds the configured number of distance evaluations per valid shaded hit. More probes are more expensive and alter the probe distribution; no measured performance claim is made. Existing multi-threaded row-progress limitations remain unchanged.
+- Useful next work is comparing against a higher-cost hemisphere visibility mode, tuning representative fractal scenes, and benchmarking fixed settings. AO selection currently requires startup configuration rather than a live toggle.
+
 ## Future entry checklist
 
 For each session, record the date, objective, completed changes, reasons for decisions, checks and results, unresolved issues, and next steps. Focus on rendering development; omit repository housekeeping and editorial changes. Include measured performance only after actual runs, with settings and machine context.

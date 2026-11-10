@@ -6,11 +6,12 @@
             [ray-marcher.scene-test]
             [ray-marcher.fractals-test]
             [ray-marcher.progress-test]
-            [ray-marcher.blend-test]))
+            [ray-marcher.blend-test]
+            [ray-marcher.ao-test]))
 
 (defn -main [& _]
   (let [{:keys [fail error]} (test/run-tests 'ray-marcher.render-test 'ray-marcher.controls-test
                                           'ray-marcher.lighting-test 'ray-marcher.scene-test
                                           'ray-marcher.fractals-test 'ray-marcher.progress-test
-                                          'ray-marcher.blend-test)]
+                                          'ray-marcher.blend-test 'ray-marcher.ao-test)]
     (when (pos? (+ fail error)) (System/exit 1))))

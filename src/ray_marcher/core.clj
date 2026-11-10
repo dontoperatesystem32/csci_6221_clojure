@@ -7,7 +7,7 @@
             [ray-marcher.ui :as ui]))
 
 (def usage
-  "Usage: clojure -M:run [--width N] [--height N] [--threads N] [--scene FILE.clj] [--lighting lambert|half-lambert|valve-half-lambert|flat] [--union hard|polynomial|exponential] [--blend WIDTH] [--output FILE] [--help]\nDefaults: 800 × 450 pixels, Lambert lighting, hard union, blend width 1.0 (world units; 0 disables blending). --output saves a PNG instead of opening a window.")
+  "Usage: clojure -M:run [--width N] [--height N] [--threads N] [--scene FILE.clj] [--lighting lambert|half-lambert|valve-half-lambert|flat] [--ao off|normal|only] [--union hard|polynomial|exponential] [--blend WIDTH] [--output FILE] [--help]\nDefaults: 800 × 450 pixels, Lambert lighting, AO off, hard union, blend width 1.0 (world units; 0 disables blending). --output saves a PNG instead of opening a window.")
 
 (defn- positive-dimension [flag value]
   (let [n (parse-long (or value ""))]
@@ -34,6 +34,9 @@
           "--lighting" (if (#{"lambert" "half-lambert" "valve-half-lambert" "flat"} value)
                          (recur remaining (assoc options :lighting (keyword value)))
                          (throw (ex-info "--lighting requires lambert, half-lambert, valve-half-lambert, or flat." {})))
+          "--ao" (if (#{"off" "normal" "only"} value)
+                   (recur remaining (assoc options :ao (keyword value)))
+                   (throw (ex-info "--ao requires off, normal, or only." {})))
           "--union" (if (#{"hard" "polynomial" "exponential"} value)
                       (recur remaining (assoc-in options [:union :mode] (keyword value)))
                       (throw (ex-info "--union requires hard, polynomial, or exponential." {})))
@@ -55,14 +58,19 @@
     :flat (assoc render-options :color-fn render/silhouette-color)
     (assoc-in render-options [:lighting :diffuse-model] mode)))
 
+(defn configure-ao
+  "Override only the AO mode, preserving scene probe settings."
+  [render-options mode]
+  (if mode (assoc-in render-options [:lighting :ao :mode] mode) render-options))
+
 (defn -main [& args]
   (try
-    (let [{:keys [width height output help? lighting scene threads union]} (parse-options args)]
+    (let [{:keys [width height output help? lighting scene threads union ao]} (parse-options args)]
       (if help?
         (println usage)
         (let [{:keys [render-options camera-state]}
               (if scene (scene-file/load-scene scene (or union {})) (scene-file/default-scene (or union {})))
-              configured (configure-lighting render-options lighting)
+              configured (configure-ao (configure-lighting render-options lighting) ao)
               render-view (fn [w h options]
                             (render/render-image w h (merge configured options)))]
           (if output
