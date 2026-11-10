@@ -2,10 +2,9 @@
   (:require [ray-marcher.scene :as scene]))
 
 ;; All coordinates use [X Y Z], with Y as height. Copy this file to start a scene.
-{:scene-distance
- (scene/union
-   (scene/sphere [10 0 -2] 2)
-   (scene/cube [12 0 2] 3))
+{:objects
+ [(scene/sphere [10 0 -2] 2)
+  (scene/cube [12 0 2] 3)]
 
  :camera {:position [0 1 -4]
           :look-at [11 0 0]

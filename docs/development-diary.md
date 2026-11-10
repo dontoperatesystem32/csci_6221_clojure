@@ -223,6 +223,51 @@ Future exploration goals include somewhat realistic black holes, fractals, wormh
 - Finite iterations, hit tolerance, and normal smoothing limit visible detail. Higher resolution and tighter settings increase CPU cost; no antialiasing or exact interior distance was added.
 - Shadows and ambient occlusion remain useful next improvements, particularly for the fractal's recesses and contact with future supporting geometry.
 
+## 2026-11-10 — Retrospective record: multi-threaded CPU rendering
+
+This entry fills a documentation gap for implementation commits dated November 2, November 3, and November 10 (America/New_York). It was recorded on November 10; verification below belongs to the November 10 integration session, not to the original implementation dates.
+
+### Implemented and decisions
+
+- **November 2 — `3575d8f`:** Added `--threads N` as a positive-integer CLI option and connected it to the interactive viewer. Rendering can divide an image into horizontal row ranges, calculate pixel vectors using Clojure futures, and assemble the results into a `BufferedImage`. This introduces CPU parallelism within an image, beyond the earlier single background worker that only kept rendering off Swing's event dispatch thread.
+- Added `render-pixels` and `pixels-to-image` to separate pixel calculation from final image assembly. Added `worker/start-multi!` and connected the viewer to it, retaining a background coordinator and one replaceable pending camera request. Swing still receives completed images through its existing event-dispatch-thread callbacks.
+- **November 3 — `8895217`:** Moved future creation and ordered collection of pixel ranges into `render/multi-render`. Added `render-image-sync` for the sequential path and made `render-image` choose between sequential rendering and parallel pixel assembly. Both the viewer and PNG export now call the same image-producing entry point; the worker no longer assembles pixel vectors itself.
+- **November 10 — `dd2c6ad`:** Made the CLI thread count default explicitly to 1 and passed it to PNG rendering as well as the viewer. Exports can now use `--threads N`, for example `clojure -M:run --threads 2 --output preview.png`. Added an explicit process exit after saving; its initial error status was corrected to success status during the later distance-blending integration, as recorded below.
+- **November 10 — `72ba9e1`:** Fixed `render-image` to pass its options map to the sequential renderer. Previously that branch dropped custom scene, camera, lighting, color, cancellation, and progress options by calling the two-argument default renderer.
+
+### Verification and limitations
+
+- Reviewed all four commit diffs and the current renderer, worker, and viewer wiring to establish the missing history. These commits introduced no new automated tests. No original-run performance measurements or native-window verification results are recorded here.
+- During the November 10 distance-blending session, the full suite passed with 32 tests and 11,022 assertions. Separate single-thread and two-thread exports of the same 160 × 120 exponential-blend scene produced byte-identical PNGs and exited successfully. This is a small integration check, not proof of correctness for every thread count or image size.
+- The parallel pixel path does not call the row-progress callback. The sequential path retains the PNG progress bar. Arbitrary row splits, thread counts greater than image height, cancellation during parallel rendering, and native viewer behavior with multiple render threads still need targeted verification.
+- No measured speedup is claimed. Future work should check row partitioning and cancellation, restore parallel progress reporting, and benchmark fixed scenes before choosing recommended thread counts.
+
+## 2026-11-10 — Distance blending experiments
+
+### Implemented and decisions
+
+- Added experimental hard minimum, polynomial smooth minimum, and exponential softmin modes through `--union hard|polynomial|exponential` and `--blend WIDTH`. Hard minimum remains the default. Width is in world units, increases blending in both smooth modes, and zero restores exact hard minimum.
+- Kept combination logic in a pure `blend` namespace and exposed `scene/blended-union` for nested groups. Mode selection is resolved during scene construction; the marcher, normal sampler, and background viewer receive the same completed distance function. No global mutable setting or replacement of minimum operations inside fractals was introduced.
+- Added an alternative scene format with an ordered `:objects` vector and optional `:union` map. This makes the group available for CLI overrides without trying to inspect opaque Clojure functions. Existing `:scene-distance` scenes remain supported. Ambiguous geometry formats and overrides of opaque functions are rejected explicitly.
+- Made the built-in sphere-and-cube group and example scene configurable. Added `scenes/blend-demo.clj` with fixed overlapping spheres, camera, and lighting, plus a three-panel rendered comparison in `docs/images/blending.png`.
+- Polynomial blending uses a finite transition region; exponential softmin uses shifted `log1p`/`exp` evaluation to avoid exponential overflow. Empty/single-object groups retain their expected behavior. Equal width does not imply equal visual strength. Polynomial reduction preserves vector order because it is not associative; exponential reduction represents a softmin over the group, subject to floating-point rounding.
+- Added `docs/distance-blending.md` and updated the README/custom-scene guide with launch/export commands, formulas and references, parameter meanings, selective nested blending, reproducibility guidance, and distance-estimator limitations.
+- Fetched origin during integration and fast-forwarded to teammate commits `dd2c6ad` and `72ba9e1`, preserving the in-progress changes. These add threaded PNG export and fix single-threaded rendering dropping supplied options. The duplicate local options fix was absorbed by the upstream commit. Corrected the newly introduced PNG success path to exit with status 0 instead of 1.
+
+### Verification
+
+- `clojure -M:test`: 32 tests, 11,022 assertions, zero failures/errors after upstream integration. New checks cover analytic blend values, numerical stability, zero width, symmetry, exponential multi-object equivalence, polynomial grouping dependence, configuration/CLI validation and overrides, empty/single-object groups, a ray through a gap that blending bridges, surface normals, and actual rendered pixels.
+- Exported and visually inspected the three 420 × 300 comparison images with identical geometry, camera, lighting, and width. The saved panel shows the hard crease, local polynomial rounding, and larger exponential swelling at width 1.
+- Ran five separate CLI exports after integration at 160 × 120: all three modes, a repeated exponential run, and a two-thread exponential run. All exited successfully. Three modes produced different PNGs; the repeated and two-thread exponential PNGs were byte-identical to the single-thread exponential PNG. Single-thread exports reported completed progress; threaded export did not report row progress.
+- Interactive UI code was unchanged; no new native-window interaction test was run in this session.
+
+### Limitations and next steps
+
+- Selection is a startup/CLI experiment, not an interactive slider. Width is not an exact rounding radius. Both modes change the surface and can bridge gaps or inflate solids; exponential influence extends beyond the immediate join and grows with object count.
+- Material color remains scene-wide. No shadows, ambient occlusion, or per-object material blending were added. Approximate Mandelbulb fields are not validated signed-solid inputs for smoothing.
+- Existing threaded rendering does not report completed rows; use the default single thread for the PNG progress bar. Threaded row scheduling, cancellation, and progress are outside this distance-blending change. No performance benchmark or general threaded-renderer correctness claim is made from the small even-sized comparison.
+- Useful next experiments are sphere/cube joins, controlled width sweeps, and measured render cost with fixed inputs. Preserve group order, scene contents, and all rendering settings when comparing results.
+
 ## Future entry checklist
 
 For each session, record the date, objective, completed changes, reasons for decisions, checks and results, unresolved issues, and next steps. Focus on rendering development; omit repository housekeeping and editorial changes. Include measured performance only after actual runs, with settings and machine context.

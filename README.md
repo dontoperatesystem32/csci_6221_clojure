@@ -36,7 +36,7 @@ To render using multiple threads in a window, use
 clojure -M:run --threads 16
 ```
 
-Note that multithreading is not enabled for rendering a single image.
+PNG exports also accept `--threads N`. The existing multi-thread path does not report row progress; use `--threads 1` (the default) for the progress bar.
 
 ## Custom scenes
 
@@ -48,6 +48,18 @@ clojure -M:run --scene scenes/example.clj --lighting valve-half-lambert --output
 ```
 
 See the [custom-scene tutorial](docs/custom-scenes.md) for a complete copyable example, coordinate conventions, object sizes, and how to define new distance functions. Scene files are ordinary executable Clojure. Without `--scene`, the built-in sphere-and-cube scene is used. A CLI lighting choice overrides the scene's model while preserving its other lighting settings.
+
+## Distance blending experiments
+
+Try rounding the join between two spheres with either polynomial smooth minimum or exponential softmin:
+
+```sh
+clojure -M:run --scene scenes/blend-demo.clj --union hard
+clojure -M:run --scene scenes/blend-demo.clj --union polynomial --blend 1
+clojure -M:run --scene scenes/blend-demo.clj --union exponential --blend 1
+```
+
+Larger `--blend` values mean more blending; zero restores hard minimum. Both modes work with PNG export. The [distance-blending guide](docs/distance-blending.md) explains the formulas, reproducible comparisons, and how to expose an `:objects` group in your own scene. Existing `:scene-distance` scenes still load; CLI blending requires an explicit object group.
 
 ## Fractal scene
 
@@ -115,7 +127,9 @@ See [lighting.md](docs/lighting.md) for the formulas, normal estimation, differe
 
 - `src/ray_marcher/core.clj`: startup and command-line options.
 - `src/ray_marcher/vector.clj`: basic 3D vector operations.
-- `src/ray_marcher/scene.clj`: sphere, cube, box, and scene union.
+- `src/ray_marcher/scene.clj`: sphere, cube, box, and composable scene unions.
+- `src/ray_marcher/blend.clj`: hard, polynomial, and stable exponential distance combiners.
+- `scenes/blend-demo.clj`: fixed scene for distance-blending comparisons.
 - `src/ray_marcher/fractals.clj`: Menger sponge distance bounds and Mandelbulb exterior estimates.
 - `src/ray_marcher/scene_file.clj`: scene loading, validation, and camera preparation.
 - `scenes/example.clj`: editable custom-scene example.

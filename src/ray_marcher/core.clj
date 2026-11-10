@@ -7,13 +7,20 @@
             [ray-marcher.ui :as ui]))
 
 (def usage
-  "Usage: clojure -M:run [--width N] [--height N] [--scene FILE.clj] [--lighting lambert|half-lambert|valve-half-lambert|flat] [--output FILE] [--help]\nDefaults: 800 × 450 pixels, Lambert lighting. --output saves a PNG instead of opening a window.")
+  "Usage: clojure -M:run [--width N] [--height N] [--threads N] [--scene FILE.clj] [--lighting lambert|half-lambert|valve-half-lambert|flat] [--union hard|polynomial|exponential] [--blend WIDTH] [--output FILE] [--help]\nDefaults: 800 × 450 pixels, Lambert lighting, hard union, blend width 1.0 (world units; 0 disables blending). --output saves a PNG instead of opening a window.")
 
 (defn- positive-dimension [flag value]
   (let [n (parse-long (or value ""))]
     (when-not (and n (<= 1 n Integer/MAX_VALUE))
       (throw (ex-info (str flag " requires a positive integer.") {:value value})))
     (int n)))
+
+(defn- blend-width [value]
+  (let [width (try (Double/parseDouble (or value ""))
+                   (catch NumberFormatException _ Double/NaN))]
+    (when-not (and (Double/isFinite width) (<= 0 width))
+      (throw (ex-info "--blend requires a finite nonnegative width in world units." {})))
+    width))
 
 (defn parse-options [args]
   (loop [args (seq args), options {:width 800 :height 450 :threads 1}]
@@ -27,6 +34,10 @@
           "--lighting" (if (#{"lambert" "half-lambert" "valve-half-lambert" "flat"} value)
                          (recur remaining (assoc options :lighting (keyword value)))
                          (throw (ex-info "--lighting requires lambert, half-lambert, valve-half-lambert, or flat." {})))
+          "--union" (if (#{"hard" "polynomial" "exponential"} value)
+                      (recur remaining (assoc-in options [:union :mode] (keyword value)))
+                      (throw (ex-info "--union requires hard, polynomial, or exponential." {})))
+          "--blend" (recur remaining (assoc-in options [:union :width] (blend-width value)))
           "--scene" (if (or (nil? value) (.startsWith ^String value "--"))
                       (throw (ex-info "--scene requires a Clojure scene-file path." {}))
                       (recur remaining (assoc options :scene value)))
@@ -46,11 +57,11 @@
 
 (defn -main [& args]
   (try
-    (let [{:keys [width height output help? lighting scene threads]} (parse-options args)]
+    (let [{:keys [width height output help? lighting scene threads union]} (parse-options args)]
       (if help?
         (println usage)
         (let [{:keys [render-options camera-state]}
-              (if scene (scene-file/load-scene scene) (scene-file/default-scene))
+              (if scene (scene-file/load-scene scene (or union {})) (scene-file/default-scene (or union {})))
               configured (configure-lighting render-options lighting)
               render-view (fn [w h options]
                             (render/render-image w h (merge configured options)))]

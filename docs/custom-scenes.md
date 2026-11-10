@@ -41,7 +41,7 @@ Create `scenes/my-scene.clj` with this content, or copy the provided `scenes/exa
             :max-steps 128}}
 ```
 
-Only `:scene-distance` is required. Omitted camera, lighting, and marching values use the application's normal defaults. Unknown configuration keys are rejected to help catch spelling mistakes.
+In this format, only `:scene-distance` is required. Alternatively, use an ordered `:objects` vector and optional `:union` settings to enable reproducible blending experiments (see below). Choose exactly one geometry format. Omitted camera, lighting, and marching values use the application's normal defaults. Unknown configuration keys are rejected to help catch spelling mistakes.
 
 Scene files execute as Clojure code when loaded, so use your own files or ones you trust. Keep distance functions pure: the same point should return the same distance without changing shared state.
 
@@ -92,6 +92,20 @@ Add objects by passing more functions to `scene/union`. It evaluates all objects
 ```
 
 The sphere at `[16 3 0]` is 3 units above the horizontal plane.
+
+## Experiment with smooth joins
+
+For CLI control, replace the completed union above with an explicit group:
+
+```clojure
+:objects [(scene/sphere [10 0 -2] 2)
+          (scene/cube [12 0 2] 3)]
+:union {:mode :polynomial :width 1.0}
+```
+
+Remove `:scene-distance` when using `:objects`. Supported modes are `:hard`, `:polynomial`, and `:exponential`. Launch with `--union exponential --blend 0.5` to override the mode and width. Larger width means more blending; zero gives the ordinary minimum. Omitted settings default to hard mode and width 1. CLI overrides only the supplied values.
+
+See [distance-blending.md](distance-blending.md) for a fixed comparison scene, PNG commands, formulas, nested groups, object-order effects, and limitations. Existing opaque distance functions and fractal scenes remain supported, but cannot be reconfigured by these flags.
 
 ## 5. Change the camera
 
