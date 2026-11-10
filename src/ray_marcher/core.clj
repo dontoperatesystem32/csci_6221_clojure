@@ -62,7 +62,7 @@
                            (image/save-png! picture output))
                          (finally (finish!)))]
               (println "Saved" (.getAbsolutePath file))
-              (System/exit 1))
+              (System/exit 0))
             (ui/show-viewer! width height render-view camera-state threads)))))
     (catch Exception e
       (binding [*out* *err*]
