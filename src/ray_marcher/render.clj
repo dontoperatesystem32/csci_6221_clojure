@@ -100,6 +100,6 @@
    (render-image width height {}))
   ([width height info]
    (if (= 1 (get info :threads 1))
-     (render-image-sync width height)
+     (render-image-sync width height info)
      (pixels-to-image width height (multi-render render-pixels width height info)))
    ))
