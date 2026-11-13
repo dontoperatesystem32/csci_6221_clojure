@@ -292,6 +292,32 @@ This entry fills a documentation gap for implementation commits dated November 2
 - Enabled AO adds the configured number of distance evaluations per valid shaded hit. More probes are more expensive and alter the probe distribution; no measured performance claim is made. Existing multi-threaded row-progress limitations remain unchanged.
 - Useful next work is comparing against a higher-cost hemisphere visibility mode, tuning representative fractal scenes, and benchmarking fixed settings. AO selection currently requires startup configuration rather than a live toggle.
 
+## 2026-11-13 — Graphical launcher and shared application configuration
+
+### Implemented and decisions
+
+- Added a Swing main menu: `clojure -M:run` now opens the launcher; `--launcher` opens it explicitly. Existing rendering arguments still run directly, and `--viewer` opens the default viewer without the menu. CLI PNG export and help remain available without a graphical desktop.
+- Added supplied-scene selection and browsing for trusted `.clj` files, width/height/thread controls, shading/AO/blending choices, and a collapsible Advanced section for camera, light/color, AO sampling, and marching limits. Selected-scene defaults are loaded into the form, rather than replaced by generic UI defaults. Hard/opaque geometry and Flat/AO dependencies disable irrelevant controls.
+- Added Open viewer, Render PNG, Reset to scene defaults, and Cancel export actions. Viewers and exports snapshot the form settings; later menu edits apply to later renders. Scene files are evaluated once per selection in a background executor. Failed scene loads restore the previous selection and keep its definition. Reset uses the loaded definition without evaluating the file again.
+- Kept code responsibilities separate: `launcher_form` defines/layouts fields and parses values; `launcher` coordinates menu actions, dialogs, and background tasks; `configuration` prepares effective scene settings for both entry paths; `application` exposes reusable viewer/export operations without process exit. The CLI remains in `core`; scene-distance and lighting calculations remain outside Swing. Rendering and scene evaluation do not run on the EDT.
+- Added threaded GUI row progress and recoverable error messages. PNG selection adds a missing extension and confirms overwrites. Cancellation is checked between rows and suppresses incomplete saves; once PNG writing starts, its cancel button is disabled. Closing a viewer preserves the menu, while closing the menu leaves other viewers available.
+- Fixed a pre-existing parallel-rendering issue exposed by freely selectable image dimensions/thread counts: replaced fractional row boundaries with integer partitions, limited task count to image height, preserved row order, and propagated cancellation rather than assembling a partial image. Added serialized total-completed-row callbacks for threaded rendering, restoring progress in CLI exports as well. Outstanding tasks are cancelled during cleanup; row tasks also check interruption.
+- Added the launcher usage guide and updated README/lighting commands and source boundaries. Exact editable numeric fields were used for repeatability rather than arbitrary slider ranges. Saved presets, command copying, live updates to open viewers, and a geometry/fractal editor remain future work.
+
+### Verification
+
+- Full headless test suite: 43 tests, 11,144 assertions, zero failures/errors. Added tests for effective scene defaults, edited configuration and validation, actual Swing form values/dependent controls, shared CLI preparation, reusable PNG export without process exit, and cancellation preserving existing files.
+- Parallel image checks compare pixels with the sequential renderer at 13 × 11 with 3 tasks, 5 × 3 with 8 requested threads, and 17 × 13 with 2 tasks. Verified ordered zero-to-height completed-row callbacks and cancellation returning no partial image. Test runner shuts down Clojure agent pools after the suite so parallel tests terminate promptly.
+- Native desktop checks loaded Mandelbulb and AO scenes, verified scene-specific values and disabled controls, exercised Flat/AO/reset behavior, exported a 121 × 79 image with 3 threads, and observed GUI progress reaching 100%. Export pixels matched a direct render with the same form values. Opened the configured viewer, observed a full-resolution frame, closed it, and verified the launcher remained open.
+- Further native checks verified recoverable missing-scene and invalid-number errors, cancellation producing no PNG, and cancellation status. Visually inspected the real launcher including its advanced fields, scrolling, and footer.
+- Separate CLI checks verified help, a 53 × 37 AO-only export with 3 threads and complete progress, and error exit statuses for conflicting launcher/render and viewer/export selections. All expected statuses matched. Origin was fetched before development; no additional teammate commits needed integration.
+
+### Limitations and next steps
+
+- The menu applies settings to new jobs only and does not persist them between sessions. Switching scenes or resetting restores 800 × 450 and one thread, alongside the scene's own rendering settings. Fractal parameters and object editing remain in scene files.
+- Cancellation is cooperative between rows; expensive rows can delay response. PNG encoding may finish after the launcher closes if writing has already started. One menu export or scene load runs at a time; other viewer windows can render independently and compete for CPU resources.
+- No benchmark, speedup, automatic quality/memory budget, or packaged desktop installer is claimed. Scene files remain executable Clojure and should be trusted. Future enhancements can add saved presets or live controls without putting rendering logic into the form.
+
 ## Future entry checklist
 
 For each session, record the date, objective, completed changes, reasons for decisions, checks and results, unresolved issues, and next steps. Focus on rendering development; omit repository housekeeping and editorial changes. Include measured performance only after actual runs, with settings and machine context.

@@ -66,12 +66,17 @@
           :render-options {:scene-distance scene-distance
                            :camera view :settings settings :lighting lighting-options}})))))
 
+(defn read-definition
+  "Evaluate a trusted local scene once; return its uncompiled definition."
+  [path]
+  (load-file path))
+
 (defn load-scene
   "Evaluate a local .clj file whose final expression returns a scene map.
   Scene files are ordinary executable Clojure, not a restricted data format."
   ([path] (load-scene path {}))
   ([path union-overrides]
-   (prepare (load-file path) union-overrides)))
+   (prepare (read-definition path) union-overrides)))
 
 (defn default-scene
   ([] (default-scene {}))

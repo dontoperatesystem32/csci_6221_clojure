@@ -49,7 +49,7 @@ These values exclude ambient fill and display encoding. The remap wraps illumina
 Compare the modes in the window or PNG exports:
 
 ```sh
-clojure -M:run
+clojure -M:run --viewer
 clojure -M:run --lighting half-lambert
 clojure -M:run --lighting valve-half-lambert
 clojure -M:run --lighting flat

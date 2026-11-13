@@ -10,7 +10,7 @@ Install a JDK (17 or newer) and the Clojure CLI. From this repository's root:
 clojure -M:run
 ```
 
-The first run downloads Clojure and its dependencies. A window displays an orange sphere and cube with matte lighting on a dark background. The camera is at `(0, 0, 0)`, looks along **+X**, and sees a sphere centered at `(10, 0, -2)` with radius `2` and a cube centered at `(12, 0, 2)` with side length `3`. Coordinates are `[X Y Z]`, so Y is height and both centers have height zero. The camera uses +Y as up and a 60° vertical field of view. The surface normal is estimated from the scene distance field and shaded using one directional light plus a small ambient fill.
+The first run downloads Clojure and its dependencies. See the [launcher guide](docs/launcher.md) for the complete menu, PNG export, and settings behavior. Use `clojure -M:run --viewer` to skip the menu. A graphical launcher opens with scene selection, rendering/effects controls, and Advanced settings. Choose **Open viewer** to display the default orange sphere and cube with matte lighting on a dark background. The camera is at `(0, 0, 0)`, looks along **+X**, and sees a sphere centered at `(10, 0, -2)` with radius `2` and a cube centered at `(12, 0, 2)` with side length `3`. Coordinates are `[X Y Z]`, so Y is height and both centers have height zero. The camera uses +Y as up and a 60° vertical field of view. The surface normal is estimated from the scene distance field and shaded using one directional light plus a small ambient fill.
 
 Image dimensions are configurable independently of the window size. The image scales to fit the window while keeping its aspect ratio; resizing the window does not change the render resolution.
 
@@ -36,7 +36,7 @@ To render using multiple threads in a window, use
 clojure -M:run --threads 16
 ```
 
-PNG exports also accept `--threads N`. The existing multi-thread path does not report row progress; use `--threads 1` (the default) for the progress bar.
+PNG exports also accept `--threads N`. Both single-thread and multi-thread exports report completed-row progress. Uneven image heights and thread counts greater than image height are supported.
 
 ## Custom scenes
 
@@ -137,7 +137,11 @@ See [lighting.md](docs/lighting.md) for the formulas, normal estimation, differe
 
 ## Project organization
 
-- `src/ray_marcher/core.clj`: startup and command-line options.
+- `src/ray_marcher/core.clj`: command-line parsing and launcher/viewer/export routing.
+- `src/ray_marcher/launcher.clj`: menu actions, file dialogs, and background jobs.
+- `src/ray_marcher/launcher_form.clj`: settings controls and form layout.
+- `src/ray_marcher/configuration.clj`: shared CLI/menu configuration and validation.
+- `src/ray_marcher/application.clj`: reusable viewer and PNG export actions.
 - `src/ray_marcher/vector.clj`: basic 3D vector operations.
 - `src/ray_marcher/scene.clj`: sphere, cube, box, and composable scene unions.
 - `src/ray_marcher/blend.clj`: hard, polynomial, and stable exponential distance combiners.
@@ -149,7 +153,7 @@ See [lighting.md](docs/lighting.md) for the formulas, normal estimation, differe
 - `scenes/mandelbulb.clj`: pale-gray Mandelbulb matching the reference's fractal family.
 - `src/ray_marcher/march.clj`: independent single-ray marcher.
 - `src/ray_marcher/camera.clj`: perspective camera and pixel ray directions.
-- `src/ray_marcher/render.clj`: sequential image rendering.
+- `src/ray_marcher/render.clj`: sequential or parallel image rendering and row progress.
 - `src/ray_marcher/lighting.clj`: distance-field normals, diffuse shading, and color conversion.
 - `src/ray_marcher/ao.clj`: deterministic normal-sampled ambient occlusion.
 - `scenes/ao-demo.clj`: sphere/cube contacts with a floor for AO comparisons.
@@ -170,9 +174,9 @@ The renderer creates a completed image that the existing window displays. The wi
 
 Results distinguish `:hit`, `:miss` (travel limit), and `:step-limit` (unresolved). Hits include the position; all results include distance traveled/bounded and number of evaluations. Starting inside an object counts as an immediate hit. The marcher expects valid settings and a unit direction. Scene functions must return exact signed distances or safe distance bounds; arbitrary implicit equations are not automatically valid inputs.
 
-The renderer casts one ray through each pixel center and accounts for image aspect ratio. Shaded orange means a hit, dark blue means a miss, and magenta means the step budget was exhausted. Near a silhouette, the finite surface tolerance can slightly expand the apparent shape. Pixel rendering is sequential, with no antialiasing, cast shadows, or reflections yet.
+The renderer casts one ray through each pixel center and accounts for image aspect ratio. Shaded orange means a hit, dark blue means a miss, and magenta means the step budget was exhausted. Near a silhouette, the finite surface tolerance can slightly expand the apparent shape. Image rows can render in parallel; there is no antialiasing, cast shadows, or reflections yet.
 
-`render-image` accepts an optional map with `:scene-distance`, `:camera`, `:settings`, and `:color-fn`. Scene construction and camera setup happen independently of the marcher. The default lighting function uses the hit position and scene distance function to estimate an outward normal. Shadow rays remain future work. An optional `:on-progress` callback receives `(completed-rows total-rows)` initially at zero and after each completed row. The renderer does not print progress itself. An optional `:cancelled?` predicate is checked between image rows; cancellation returns `nil`. The viewer uses this to abandon obsolete full-resolution frames. Pixel calculations remain sequential within each frame; background rendering does not yet use multiple CPU cores for a single image.
+`render-image` accepts an optional map with `:scene-distance`, `:camera`, `:settings`, and `:color-fn`. Scene construction and camera setup happen independently of the marcher. The default lighting function uses the hit position and scene distance function to estimate an outward normal. Shadow rays remain future work. An optional `:on-progress` callback receives `(completed-rows total-rows)` initially at zero and after each completed row. The renderer does not print progress itself. An optional `:cancelled?` predicate is checked between image rows; cancellation returns `nil`. The viewer uses this to abandon obsolete full-resolution frames. `:threads` selects parallel row tasks. Row ranges use integer boundaries and are collected in image order; progress reports total completed rows, and cancellation returns no partial image.
 
 ## Verification
 
