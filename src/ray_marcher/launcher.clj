@@ -46,7 +46,8 @@
                  ["Menger sponge" "scenes/menger.clj"]
                  ["Mandelbulb" "scenes/mandelbulb.clj"]
                  ["Blending demo" "scenes/blend-demo.clj"]
-                 ["Ambient occlusion demo" "scenes/ao-demo.clj"]])))
+                 ["Ambient occlusion demo" "scenes/ao-demo.clj"]
+                 ["Floor and shadows" "scenes/shadows.clj"]])))
 
 (defn- fill-scene! [{:keys [form definition note] :as menu} scene values]
   (reset! definition scene)

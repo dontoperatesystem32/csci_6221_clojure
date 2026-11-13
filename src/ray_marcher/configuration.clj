@@ -5,6 +5,7 @@
             [ray-marcher.march :as march]
             [ray-marcher.render :as render]
             [ray-marcher.scene :as scene]
+            [ray-marcher.shadows :as shadows]
             [ray-marcher.scene-file :as scene-file]))
 
 (def default-camera {:position [0 0 0] :look-at [10 0 0] :fov 60})
@@ -19,6 +20,9 @@
 (defn configure-ao [render-options mode]
   (if mode (assoc-in render-options [:lighting :ao :mode] mode) render-options))
 
+(defn configure-shadows [render-options mode]
+  (if mode (assoc-in render-options [:lighting :shadows :mode] mode) render-options))
+
 (defn form-values
   "Validate a scene and expose its actual effective settings for editing."
   [definition]
@@ -27,7 +31,8 @@
    :shading (get-in definition [:lighting :diffuse-model] :lambert)
    :camera (merge default-camera (:camera definition))
    :lighting (assoc (merge lighting/default-settings (:lighting definition))
-                    :ao (ao/settings (get-in definition [:lighting :ao] {})))
+                    :ao (ao/settings (get-in definition [:lighting :ao] {}))
+                    :shadows (shadows/settings (get-in definition [:lighting :shadows] {})))
    :settings (merge march/default-settings (:settings definition))
    :union (merge {:mode :hard :width 1.0} (:union definition))})
 
@@ -59,8 +64,8 @@
         prepared (scene-file/prepare edited)]
     (update prepared :render-options configure-lighting shading)))
 
-(defn prepare-cli [{:keys [scene union lighting ao] :as options}]
+(defn prepare-cli [{:keys [scene union lighting ao shadows] :as options}]
   (validate-render-size! options)
   (let [definition (if scene (scene-file/read-definition scene) (default-definition))
         prepared (scene-file/prepare definition (or union {}))]
-    (update prepared :render-options #(configure-ao (configure-lighting % lighting) ao))))
+    (update prepared :render-options #(-> % (configure-lighting lighting) (configure-ao ao) (configure-shadows shadows)))))

@@ -75,6 +75,11 @@
         (is (not (.isEnabled (c [:union :mode]))))
         (is (not (.isEnabled (c [:union :width]))))
         (is (map? (configuration/prepare-form definition ((:read-values menu-form)))))
+        (.setSelectedIndex (c [:lighting :shadows :mode]) 1)
+        (is (.isEnabled (c [:lighting :shadows :max-steps])))
+        (.setSelectedIndex (c [:lighting :ao :mode]) 2)
+        (is (not (.isEnabled (c [:lighting :shadows :mode]))))
+        (is (not (.isEnabled (c [:lighting :shadows :bias]))))
         (.setText (c [:camera :position]) "1, 2")
         (is (thrown? clojure.lang.ExceptionInfo ((:read-values menu-form))))))))
 

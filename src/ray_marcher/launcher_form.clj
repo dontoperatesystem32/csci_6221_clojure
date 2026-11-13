@@ -9,6 +9,7 @@
 (def shading-choices [["Lambert" :lambert] ["Half-Lambert" :half-lambert]
                       ["Valve Half-Lambert" :valve-half-lambert] ["Flat silhouette" :flat]])
 (def ao-choices [["Off" :off] ["Normal-sampled AO" :normal] ["AO only (grayscale)" :only]])
+(def shadow-choices [["Off" :off] ["Hard shadows" :hard]])
 (def union-choices [["Hard minimum" :hard] ["Polynomial smooth minimum" :polynomial]
                     ["Exponential softmin" :exponential]])
 
@@ -18,6 +19,7 @@
                                 [[:threads] "Rendering threads" :integer]]}
    {:title "Effects" :fields [[[:shading] "Shading" shading-choices]
                               [[:lighting :ao :mode] "Ambient occlusion" ao-choices]
+                              [[:lighting :shadows :mode] "Cast shadows" shadow-choices]
                               [[:union :mode] "Object blending" union-choices]
                               [[:union :width] "Blend width (world units)" :number]]}
    {:title "Camera" :advanced? true
@@ -35,6 +37,11 @@
              [[:lighting :ao :radius] "AO sampling radius" :number]
              [[:lighting :ao :bias] "AO sampling bias" :number]
              [[:lighting :ao :strength] "AO strength" :number]]}
+   {:title "Shadow tuning" :advanced? true
+    :fields [[[:lighting :shadows :bias] "Shadow surface bias" :number]
+             [[:lighting :shadows :epsilon] "Shadow hit tolerance" :number]
+             [[:lighting :shadows :max-distance] "Shadow travel limit" :number]
+             [[:lighting :shadows :max-steps] "Shadow step limit" :integer]]}
    {:title "Marching" :advanced? true
     :fields [[[:settings :max-steps] "Maximum steps per ray" :integer]
              [[:settings :max-distance] "Maximum travel distance" :number]
@@ -91,10 +98,15 @@
         choice #(read-value (component %) (:kind (fields %)) (:label (fields %)))
         update-enabled! (fn []
                           (let [flat? (= :flat (choice [:shading]))
-                                ao? (and (not flat?) (not= :off (choice [:lighting :ao :mode])))]
+                                ao? (and (not flat?) (not= :off (choice [:lighting :ao :mode])))
+                                shadows? (and (not flat?) (not= :only (choice [:lighting :ao :mode])))
+                                hard? (and shadows? (= :hard (choice [:lighting :shadows :mode])))]
                             (.setEnabled (component [:union :mode]) @blendable?)
                             (.setEnabled (component [:union :width]) (and @blendable? (not= :hard (choice [:union :mode]))))
                             (.setEnabled (component [:lighting :ao :mode]) (not flat?))
+                            (.setEnabled (component [:lighting :shadows :mode]) shadows?)
+                            (doseq [k [:bias :epsilon :max-distance :max-steps]]
+                              (.setEnabled (component [:lighting :shadows k]) hard?))
                             (doseq [k [:samples :radius :bias :strength]]
                               (.setEnabled (component [:lighting :ao k]) ao?))))]
     (doseq [{:keys [title fields advanced?]} field-groups]
@@ -109,7 +121,7 @@
     (.add panel toggle)
     (.add panel advanced)
     (listen! toggle #(do (.setVisible advanced (.isSelected toggle)) (.revalidate panel)))
-    (doseq [path [[:shading] [:lighting :ao :mode] [:union :mode]]]
+    (doseq [path [[:shading] [:lighting :ao :mode] [:lighting :shadows :mode] [:union :mode]]]
       (listen! (component path) update-enabled!))
     {:panel panel :fields fields :advanced-button toggle
      :read-values (fn []

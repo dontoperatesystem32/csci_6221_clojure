@@ -6,7 +6,7 @@
             [ray-marcher.progress :as progress]))
 
 (def usage
-  "Usage: clojure -M:run [--launcher | --viewer] [--width N] [--height N] [--threads N] [--scene FILE.clj] [--lighting lambert|half-lambert|valve-half-lambert|flat] [--ao off|normal|only] [--union hard|polynomial|exponential] [--blend WIDTH] [--output FILE] [--help]\nNo arguments opens the graphical launcher. Rendering flags run directly; --viewer opens the default viewer.\nDefaults: 800 × 450 pixels, Lambert lighting, AO off, hard union, blend width 1.0 (world units; 0 disables blending). --output saves a PNG instead of opening a window.")
+  "Usage: clojure -M:run [--launcher | --viewer] [--width N] [--height N] [--threads N] [--scene FILE.clj] [--lighting lambert|half-lambert|valve-half-lambert|flat] [--ao off|normal|only] [--shadows off|hard] [--union hard|polynomial|exponential] [--blend WIDTH] [--output FILE] [--help]\nNo arguments opens the graphical launcher. Rendering flags run directly; --viewer opens the default viewer.\nDefaults: 800 × 450 pixels, Lambert lighting, AO and shadows off, hard union, blend width 1.0 (world units; 0 disables blending). --output saves a PNG instead of opening a window.")
 
 (defn- positive-dimension [flag value]
   (let [n (parse-long (or value ""))]
@@ -38,6 +38,9 @@
           "--ao" (if (#{"off" "normal" "only"} value)
                    (recur remaining (assoc options :ao (keyword value)))
                    (throw (ex-info "--ao requires off, normal, or only." {})))
+          "--shadows" (if (#{"off" "hard"} value)
+                        (recur remaining (assoc options :shadows (keyword value)))
+                        (throw (ex-info "--shadows requires off or hard." {})))
           "--union" (if (#{"hard" "polynomial" "exponential"} value)
                       (recur remaining (assoc-in options [:union :mode] (keyword value)))
                       (throw (ex-info "--union requires hard, polynomial, or exponential." {})))

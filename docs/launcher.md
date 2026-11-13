@@ -12,7 +12,7 @@ The launcher uses the same Swing toolkit as the viewer and introduces no depende
 
 ## Choose a scene
 
-The dropdown lists the built-in sphere/cube scene and the supplied example, Menger, Mandelbulb, blending, and AO scenes found in the project's `scenes` folder. **Browse .clj…** loads another local scene. Paths are relative to your launch directory unless absolute. Scene files execute Clojure code, so open trusted files.
+The dropdown lists the built-in sphere/cube scene and the supplied example, Menger, Mandelbulb, blending, AO, and floor/shadow scenes found in the project's `scenes` folder. **Browse .clj…** loads another local scene. Paths are relative to your launch directory unless absolute. Scene files execute Clojure code, so open trusted files.
 
 Selection evaluates the scene once on a background thread and fills the menu with its actual camera, lighting, AO, blending, and marching values. A failed load shows an error and restores the previous selection/settings. Switching scenes resets image size and thread count to 800 × 450 and 1. **Reset to scene defaults** restores the loaded definition without re-evaluating the file; to pick up file edits, select another scene and return, or browse to the file again.
 
@@ -22,15 +22,16 @@ Selection evaluates the scene once on a background thread and fills the menu wit
 |---|---|
 | Scene | Supplied scene dropdown; custom file browser |
 | Rendering | Width, height, thread count |
-| Effects | Lambert / Half-Lambert / Valve Half-Lambert / Flat; AO off / normal / only; hard / polynomial / exponential blending; blend width |
+| Effects | Lambert / Half-Lambert / Valve Half-Lambert / Flat; AO off / normal / only; cast shadows off / hard; hard / polynomial / exponential blending; blend width |
 | Advanced → Camera | Initial position, look-at point, vertical field of view |
 | Advanced → Lighting | Base-color chooser, direction toward light, ambient brightness, diffuse strength, normal sampling distance |
 | Advanced → AO tuning | Sample count, radius, bias, strength |
+| Advanced → Shadow tuning | Surface bias, shadow hit tolerance, maximum shadow distance, maximum shadow steps |
 | Advanced → Marching | Maximum ray steps, maximum travel distance, hit tolerance |
 
 Expand **Advanced settings** and scroll to see its fields. Coordinates accept three numbers separated by commas or spaces, in X, Y, Z order. Distances use world units. Exact numeric values are editable; the first version uses numeric fields rather than sliders with arbitrary ranges.
 
-AO controls are disabled under Flat shading, and AO tuning is disabled while AO is off. Blend width is disabled for hard union. Both blending controls are disabled for scenes defined with an opaque `:scene-distance`, including the current fractal presets: they do not expose an object group for reconfiguration. Disabled modes do not erase the previous values.
+AO controls are disabled under Flat shading, and AO tuning is disabled while AO is off. Shadow controls are disabled under Flat shading or AO-only display; shadow tuning is enabled only for hard shadows. Blend width is disabled for hard union. Both blending controls are disabled for scenes defined with an opaque `:scene-distance`, including the current fractal presets: they do not expose an object group for reconfiguration. Disabled modes do not erase the previous values.
 
 Geometry editing, fractal parameters, saved launcher presets, and a copy-command action are not included. Those remain scene-file edits or possible future features. Settings are not persisted between launches.
 

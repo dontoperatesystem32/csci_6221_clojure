@@ -1,7 +1,8 @@
 (ns ray-marcher.lighting
   "Distance-field normals and simple matte directional lighting, independent of UI."
   (:require [ray-marcher.vector :as v]
-            [ray-marcher.ao :as ao]))
+            [ray-marcher.ao :as ao]
+            [ray-marcher.shadows :as shadows]))
 
 (def default-settings
   {:toward-light [-0.6 0.8 -0.5]
@@ -10,7 +11,8 @@
    :normal-step 0.001
    :base-color 0xF5AC48
    :diffuse-model :lambert
-   :ao ao/default-settings})
+   :ao ao/default-settings
+   :shadows shadows/default-settings})
 
 (defn surface-normal
   "Estimate the outward gradient with six central-difference distance samples.
@@ -58,6 +60,7 @@
   ([scene-distance settings]
    (let [ao-settings (ao/settings (get settings :ao {}))
          accessibility (ao/make-accessibility scene-distance ao-settings)
+         visibility (shadows/make-visibility scene-distance (get settings :shadows {}))
          {:keys [toward-light ambient diffuse-strength normal-step base-color diffuse-model]}
          (merge default-settings settings)
          light (v/normalize toward-light)
@@ -76,8 +79,16 @@
                diffuse (if (zero? (v/length normal)) 0.0
                            (diffuse-factor normal light diffuse-model))
                access (accessibility position normal)
-               brightness (+ (* ambient access) (* diffuse-strength diffuse))
+               ;; AO-only and surfaces without direct light need no shadow ray.
+               shadow (if (and (not= :only (:mode ao-settings)) (pos? diffuse-strength) (pos? diffuse))
+                        (visibility position normal light)
+                        :visible)
+               direct (if (= shadow :blocked) 0.0 (* diffuse-strength diffuse))
+               brightness (+ (* ambient access) direct)
                [r g b] (if (= :only (:mode ao-settings))
                          (vec (repeat 3 (linear-to-srgb access)))
                          (mapv #(linear-to-srgb (* % brightness)) base))]
-           (bit-or (bit-shift-left r 16) (bit-shift-left g 8) b)))))))
+           ;; Cyan means the secondary ray exhausted its budget; it is neither
+           ;; a confirmed shadow nor a confirmed clear path.
+           (if (= shadow :unresolved) 0x00FFFF
+               (bit-or (bit-shift-left r 16) (bit-shift-left g 8) b))))))))

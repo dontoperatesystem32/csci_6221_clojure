@@ -49,6 +49,17 @@ clojure -M:run --scene scenes/example.clj --lighting valve-half-lambert --output
 
 See the [custom-scene tutorial](docs/custom-scenes.md) for a complete copyable example, coordinate conventions, object sizes, and how to define new distance functions. Scene files are ordinary executable Clojure. Without `--scene`, the built-in sphere-and-cube scene is used. A CLI lighting choice overrides the scene's model while preserving its other lighting settings.
 
+## Floor and cast shadows
+
+Select **Floor and shadows** in the launcher, then compare **Cast shadows → Off / Hard shadows**. Or run:
+
+```sh
+clojure -M:run --scene scenes/shadows.clj --shadows hard
+clojure -M:run --scene scenes/shadows.clj --shadows off
+```
+
+A secondary ray toward the light tests for blockers. Shadows affect direct light; ambient fill and AO remain separate. Shadows are off by default outside scenes that enable them. See the [floor and shadows guide](docs/shadows.md) for configuration, the reusable floor function, and cyan shadow-budget diagnostics.
+
 ## Ambient occlusion
 
 Use normal-direction distance probes to darken ambient light near contacts and crevices:
@@ -59,7 +70,7 @@ clojure -M:run --scene scenes/ao-demo.clj --ao only
 clojure -M:run --scene scenes/ao-demo.clj --ao off
 ```
 
-AO is off by default; the demo enables it. All modes also work for PNG export and threaded rendering. See the [AO guide](docs/ambient-occlusion.md) for sample/radius/strength settings, comparisons, and approximation limits. AO affects ambient fill; directional-light cast shadows remain future work.
+AO is off by default; the demo enables it. All modes also work for PNG export and threaded rendering. See the [AO guide](docs/ambient-occlusion.md) for sample/radius/strength settings, comparisons, and approximation limits. AO affects ambient fill; optional hard shadows affect direct light.
 
 ## Distance blending experiments
 
@@ -133,7 +144,7 @@ clojure -M:run --lighting flat
 
 The alternative uses the proposed `clamp(dot(n,l)*0.5+0.5, 0, 1)` remap with the same ambient fill. The `valve-half-lambert` mode squares that remapped diffuse term before applying the same ambient fill. Flat mode preserves the earlier silhouette for comparison. Modes are selected at launch and also work with `--output`.
 
-See [lighting.md](docs/lighting.md) for the formulas, normal estimation, differences between the models, and configurable lighting settings. Optional AO attenuates ambient fill; there are no directional-light cast shadows or simulated light bounces yet.
+See [lighting.md](docs/lighting.md) for the formulas, normal estimation, differences between the models, and configurable lighting settings. Optional AO attenuates ambient fill; hard cast shadows are optional, while simulated light bounces remain future work.
 
 ## Project organization
 
@@ -156,6 +167,8 @@ See [lighting.md](docs/lighting.md) for the formulas, normal estimation, differe
 - `src/ray_marcher/render.clj`: sequential or parallel image rendering and row progress.
 - `src/ray_marcher/lighting.clj`: distance-field normals, diffuse shading, and color conversion.
 - `src/ray_marcher/ao.clj`: deterministic normal-sampled ambient occlusion.
+- `src/ray_marcher/shadows.clj`: hard directional-light visibility using secondary rays.
+- `scenes/shadows.clj`: sphere/cube floor scene with hard shadows.
 - `scenes/ao-demo.clj`: sphere/cube contacts with a floor for AO comparisons.
 - `src/ray_marcher/image.clj`: PNG output.
 - `src/ray_marcher/progress.clj`: terminal progress reporting for PNG exports.
@@ -174,9 +187,9 @@ The renderer creates a completed image that the existing window displays. The wi
 
 Results distinguish `:hit`, `:miss` (travel limit), and `:step-limit` (unresolved). Hits include the position; all results include distance traveled/bounded and number of evaluations. Starting inside an object counts as an immediate hit. The marcher expects valid settings and a unit direction. Scene functions must return exact signed distances or safe distance bounds; arbitrary implicit equations are not automatically valid inputs.
 
-The renderer casts one ray through each pixel center and accounts for image aspect ratio. Shaded orange means a hit, dark blue means a miss, and magenta means the step budget was exhausted. Near a silhouette, the finite surface tolerance can slightly expand the apparent shape. Image rows can render in parallel; there is no antialiasing, cast shadows, or reflections yet.
+The renderer casts one ray through each pixel center and accounts for image aspect ratio. Shaded orange means a hit, dark blue means a miss, and magenta means the step budget was exhausted. Near a silhouette, the finite surface tolerance can slightly expand the apparent shape. Image rows can render in parallel; there is no antialiasing or reflections yet; hard cast shadows are optional.
 
-`render-image` accepts an optional map with `:scene-distance`, `:camera`, `:settings`, and `:color-fn`. Scene construction and camera setup happen independently of the marcher. The default lighting function uses the hit position and scene distance function to estimate an outward normal. Shadow rays remain future work. An optional `:on-progress` callback receives `(completed-rows total-rows)` initially at zero and after each completed row. The renderer does not print progress itself. An optional `:cancelled?` predicate is checked between image rows; cancellation returns `nil`. The viewer uses this to abandon obsolete full-resolution frames. `:threads` selects parallel row tasks. Row ranges use integer boundaries and are collected in image order; progress reports total completed rows, and cancellation returns no partial image.
+`render-image` accepts an optional map with `:scene-distance`, `:camera`, `:settings`, and `:color-fn`. Scene construction and camera setup happen independently of the marcher. The default lighting function uses the hit position and scene distance function to estimate an outward normal. Optional hard-shadow rays test directional-light visibility. An optional `:on-progress` callback receives `(completed-rows total-rows)` initially at zero and after each completed row. The renderer does not print progress itself. An optional `:cancelled?` predicate is checked between image rows; cancellation returns `nil`. The viewer uses this to abandon obsolete full-resolution frames. `:threads` selects parallel row tasks. Row ranges use integer boundaries and are collected in image order; progress reports total completed rows, and cancellation returns no partial image.
 
 ## Verification
 
