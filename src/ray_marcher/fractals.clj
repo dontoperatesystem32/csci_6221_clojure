@@ -90,3 +90,88 @@
                                (+ (* raised (Math/cos theta)) b)
                                (+ (* raised sin-theta (Math/sin phi)) c)
                                next-derivative)))))))))))))
+
+(defn fractal-world
+  "Continuous, connected 3D fractal world using an AmazingBox + KIFS fold hybrid
+  in Mandelbrot mode. Produces unbroken caverns, arches, and organic structures
+  without disconnected floating spheres. Supports (f px py pz) and (f [px py pz])."
+  ([scale] (fractal-world scale {}))
+  ([scale settings]
+   (let [{:keys [iterations bailout step-factor
+                 fold-limit box-scale min-radius fold-period rot-angles]
+          :or {iterations 18
+               bailout 32.0
+               step-factor 0.55
+               fold-limit 1.0
+               box-scale -1.85
+               min-radius 0.45
+               fold-period 2
+               rot-angles [0.22 -0.18 0.12]}} settings]
+     (let [world-scale (double scale)
+           safe-scale (* world-scale step-factor)
+           fl (double fold-limit)
+           bs (double box-scale)
+           mr2 (* (double min-radius) (double min-radius))
+           fr2 1.0
+           [rx ry rz] (mapv double rot-angles)
+           cx (Math/cos rx) sx (Math/sin rx)
+           cy (Math/cos ry) sy (Math/sin ry)
+           cz (Math/cos rz) sz (Math/sin rz)
+           eval-de
+           (fn [^double px ^double py ^double pz]
+             (let [a (/ px world-scale)
+                   b (/ py world-scale)
+                   c (/ pz world-scale)]
+               (* safe-scale
+                  (loop [i 0, x a, y b, z c, derivative 1.0]
+                    (let [r2 (+ (* x x) (* y y) (* z z))
+                          r (Math/sqrt r2)]
+                      (cond
+                        (> r bailout) (/ r (Math/abs derivative))
+                        (>= i iterations) 0.0
+                        :else
+                        ;; 1. Apply 3D rotation to curve straight box corridors into arches
+                        (let [y1 (- (* y cx) (* z sx))
+                              z1 (+ (* y sx) (* z cx))
+                              x2 (+ (* x cy) (* z1 sy))
+                              z2 (- (* z1 cy) (* x sy))
+                              rx-pos (- (* x2 cz) (* y1 sz))
+                              ry-pos (+ (* x2 sz) (* y1 cz))
+                              rz-pos z2]
+                          (if (zero? (mod i fold-period))
+                            ;; 2A. AMAZINGBOX FOLD (Continuous structural grid & vaults)
+                            (let [fx (- (max (- fl) (min fl rx-pos)) (* 2.0 (- rx-pos (max (- fl) (min fl rx-pos)))))
+                                  fy (- (max (- fl) (min fl ry-pos)) (* 2.0 (- ry-pos (max (- fl) (min fl ry-pos)))))
+                                  fz (- (max (- fl) (min fl rz-pos)) (* 2.0 (- rz-pos (max (- fl) (min fl rz-pos)))))
+                                  fr-sq (+ (* fx fx) (* fy fy) (* fz fz))
+                                  sphere-mult (cond
+                                                (< fr-sq mr2) (/ fr2 mr2)
+                                                (< fr-sq fr2) (/ fr2 fr-sq)
+                                                :else 1.0)
+                                  scale-mult (* bs sphere-mult)]
+                              (recur (inc i)
+                                     (+ (* fx scale-mult) a)
+                                     (+ (* fy scale-mult) b)
+                                     (+ (* fz scale-mult) c)
+                                     (+ (* derivative (Math/abs scale-mult)) 1.0)))
+
+                            ;; 2B. KIFS OCTAHEDRAL / ORGANIC FOLD (Bends flat walls into continuous ribs)
+                            (let [ax (Math/abs rx-pos)
+                                  ay (Math/abs ry-pos)
+                                  az (Math/abs rz-pos)
+                                  ;; Sort coordinates so x >= y >= z (creates smooth curved manifolds)
+                                  [sx1 sy1] (if (< ax ay) [ay ax] [ax ay])
+                                  [sx2 sz1] (if (< sx1 az) [az sx1] [sx1 az])
+                                  [sy2 sz2] (if (< sy1 sz1) [sz1 sy1] [sy1 sz1])
+                                  k-scale 1.65
+                                  nx (- (* sx2 k-scale) 1.0)
+                                  ny (- (* sy2 k-scale) 0.5)
+                                  nz (* sz2 k-scale)]
+                              (recur (inc i)
+                                     (+ nx a)
+                                     (+ ny b)
+                                     (+ nz c)
+                                     (+ (* derivative k-scale) 1.0)))))))))))]
+       (fn
+         ([[px py pz]] (eval-de px py pz))
+         ([px py pz] (eval-de px py pz)))))))
