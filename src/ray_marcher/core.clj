@@ -1,13 +1,12 @@
 (ns ray-marcher.core
   "Application entry point: interactive window or a single PNG export."
-  (:require [ray-marcher.image :as image]
-            [ray-marcher.progress :as progress]
-            [ray-marcher.render :as render]
-            [ray-marcher.scene-file :as scene-file]
-            [ray-marcher.ui :as ui]))
+  (:require [ray-marcher.application :as application]
+            [ray-marcher.configuration :as configuration]
+            [ray-marcher.launcher :as launcher]
+            [ray-marcher.progress :as progress]))
 
 (def usage
-  "Usage: clojure -M:run [--width N] [--height N] [--threads N] [--scene FILE.clj] [--lighting lambert|half-lambert|valve-half-lambert|flat] [--ao off|normal|only] [--union hard|polynomial|exponential] [--blend WIDTH] [--output FILE] [--help]\nDefaults: 800 × 450 pixels, Lambert lighting, AO off, hard union, blend width 1.0 (world units; 0 disables blending). --output saves a PNG instead of opening a window.")
+  "Usage: clojure -M:run [--launcher | --viewer] [--width N] [--height N] [--threads N] [--scene FILE.clj] [--lighting lambert|half-lambert|valve-half-lambert|flat] [--ao off|normal|only] [--shadows off|hard] [--union hard|polynomial|exponential] [--blend WIDTH] [--output FILE] [--help]\nNo arguments opens the graphical launcher. Rendering flags run directly; --viewer opens the default viewer.\nDefaults: 800 × 450 pixels, Lambert lighting, AO and shadows off, hard union, blend width 1.0 (world units; 0 disables blending). --output saves a PNG instead of opening a window.")
 
 (defn- positive-dimension [flag value]
   (let [n (parse-long (or value ""))]
@@ -29,6 +28,8 @@
       (let [[flag value & remaining] args]
         (case flag
           "--help" (assoc options :help? true)
+          "--launcher" (recur (next args) (assoc options :launcher? true))
+          "--viewer" (recur (next args) (assoc options :viewer? true))
           "--width" (recur remaining (assoc options :width (positive-dimension flag value)))
           "--height" (recur remaining (assoc options :height (positive-dimension flag value)))
           "--lighting" (if (#{"lambert" "half-lambert" "valve-half-lambert" "flat"} value)
@@ -37,6 +38,9 @@
           "--ao" (if (#{"off" "normal" "only"} value)
                    (recur remaining (assoc options :ao (keyword value)))
                    (throw (ex-info "--ao requires off, normal, or only." {})))
+          "--shadows" (if (#{"off" "hard"} value)
+                        (recur remaining (assoc options :shadows (keyword value)))
+                        (throw (ex-info "--shadows requires off or hard." {})))
           "--union" (if (#{"hard" "polynomial" "exponential"} value)
                       (recur remaining (assoc-in options [:union :mode] (keyword value)))
                       (throw (ex-info "--union requires hard, polynomial, or exponential." {})))
@@ -50,39 +54,31 @@
           "--threads" (recur remaining (assoc options :threads (positive-dimension flag value)))
           (throw (ex-info (str "Unknown option: " flag) {})))))))
 
-(defn configure-lighting
-  "A CLI lighting choice overrides only the model, preserving scene light settings."
-  [render-options mode]
-  (case mode
-    nil render-options
-    :flat (assoc render-options :color-fn render/silhouette-color)
-    (assoc-in render-options [:lighting :diffuse-model] mode)))
-
-(defn configure-ao
-  "Override only the AO mode, preserving scene probe settings."
-  [render-options mode]
-  (if mode (assoc-in render-options [:lighting :ao :mode] mode) render-options))
+(def configure-lighting configuration/configure-lighting)
+(def configure-ao configuration/configure-ao)
 
 (defn -main [& args]
   (try
-    (let [{:keys [width height output help? lighting scene threads union ao]} (parse-options args)]
-      (if help?
-        (println usage)
-        (let [{:keys [render-options camera-state]}
-              (if scene (scene-file/load-scene scene (or union {})) (scene-file/default-scene (or union {})))
-              configured (configure-ao (configure-lighting render-options lighting) ao)
-              render-view (fn [w h options]
-                            (render/render-image w h (merge configured options)))]
+    (let [{:keys [output help? launcher? viewer?] :as options} (parse-options args)]
+      (cond
+        help? (println usage)
+        (or (empty? args) launcher?)
+        (do
+          (when (and launcher? (not= (vec args) ["--launcher"]))
+            (throw (ex-info "Use --launcher on its own; choose settings in the menu." {})))
+          (launcher/show-launcher!))
+        :else
+        (let [prepared (configuration/prepare-cli options)]
+          (when (and viewer? output)
+            (throw (ex-info "Choose either --viewer or --output." {})))
           (if output
             (let [{:keys [report! writing! finish!]} (progress/reporter)
-                  file (try
-                         (let [picture (render-view width height {:on-progress report! :threads threads})]
-                           (writing!)
-                           (image/save-png! picture output))
-                         (finally (finish!)))]
+                  file (try (application/export! options prepared output
+                                                 {:on-progress report! :on-writing writing!})
+                            (finally (finish!)))]
               (println "Saved" (.getAbsolutePath file))
               (System/exit 0))
-            (ui/show-viewer! width height render-view camera-state threads)))))
+            (application/open-viewer! options prepared)))))
     (catch Exception e
       (binding [*out* *err*]
         (println "Could not start:" (.getMessage e))

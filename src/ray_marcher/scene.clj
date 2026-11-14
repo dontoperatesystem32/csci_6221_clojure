@@ -32,6 +32,14 @@
   (apply blended-union {:mode :hard} shapes))
 
 
+(defn floor-plane
+  "Exact signed distance for an infinite horizontal floor at height Y.
+  Space below the floor is solid; positive Y points upward."
+  [height]
+  (when-not (and (number? height) (Double/isFinite (double height)))
+    (throw (ex-info "Floor height must be a finite number." {})))
+  (fn [[_ y _]] (- y height)))
+
 (defn box
   "Exact signed distance and color for an axis-aligned box. Half-sizes are [hx hy hz]."
   ([center half-sizes]

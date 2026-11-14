@@ -1,6 +1,6 @@
 # Basic diffuse lighting
 
-The renderer shades the sphere with one white directional light and a small ambient fill. The light is fixed in world space, so moving the camera does not move it. Shadows, reflections, and light bouncing are not implemented yet.
+The renderer shades the sphere with one white directional light and a small ambient fill. The light is fixed in world space, so moving the camera does not move it. Hard directional-light shadows are optional; reflections and light bouncing are not implemented yet.
 
 ## The two directions
 
@@ -49,7 +49,7 @@ These values exclude ambient fill and display encoding. The remap wraps illumina
 Compare the modes in the window or PNG exports:
 
 ```sh
-clojure -M:run
+clojure -M:run --viewer
 clojure -M:run --lighting half-lambert
 clojure -M:run --lighting valve-half-lambert
 clojure -M:run --lighting flat
@@ -90,7 +90,7 @@ Lighting is calculated in linear RGB, then converted back to sRGB for display. S
 
 `ray-marcher.lighting/default-settings` contains the light direction, base color, ambient amount, diffuse strength, normal-sampling step, and model. Pass overrides through `render-image`'s `:lighting` map. An explicit `:color-fn` still overrides default lighting, preserving silhouette rendering for geometry checks.
 
-The lighting module has no camera or Swing dependencies. The marcher still only finds hit information. Each shaded hit adds six scene-distance evaluations for its normal; it does not cast shadow rays.
+The lighting module has no camera or Swing dependencies. The marcher still only finds hit information. Each shaded hit adds six scene-distance evaluations for its normal. Optional AO probes and eligible hard-shadow queries add their own distance evaluations.
 
 ## Ambient occlusion
 
@@ -102,7 +102,13 @@ brightness = ambient * accessibility + diffuseStrength * diffuse
 
 Enable it with `--ao normal`, inspect grayscale accessibility with `--ao only`, or disable it with `--ao off`. Default mode is off unless a scene enables it. Scene settings live in `:lighting {:ao {...}}`. The same scene field supplies normals and AO probes, including when smooth unions are used. Direct diffuse remains unchanged; flat/custom coloring bypasses AO.
 
-See [ambient-occlusion.md](ambient-occlusion.md) for configuration, derivation, the step-count counterexample, and limitations. Enabled AO adds the configured number of scene-distance probes per valid shaded hit. It does not simulate light bouncing or directional-light visibility.
+See [ambient-occlusion.md](ambient-occlusion.md) for configuration, derivation, the step-count counterexample, and limitations. Enabled AO adds the configured number of scene-distance probes per valid shaded hit. AO does not simulate light bouncing or directional-light visibility; the separate shadow module handles direct-light visibility.
+
+## Cast shadows
+
+Use `--shadows hard` or the launcher’s Cast shadows control to trace secondary rays toward the directional light. Blocked points lose the direct contribution; ambient fill and AO remain separate. The formula becomes `ambient * accessibility + diffuseStrength * diffuse * visibility`, where resolved hard-shadow visibility is 0 or 1. Shadows default to off unless the scene enables them.
+
+See [shadows.md](shadows.md) for the floor demo, bias/limits, cyan unresolved-ray diagnostics, and scene configuration. Flat/custom coloring and AO-only display bypass shadow queries.
 
 ## References
 

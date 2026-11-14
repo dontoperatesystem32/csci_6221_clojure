@@ -292,6 +292,56 @@ This entry fills a documentation gap for implementation commits dated November 2
 - Enabled AO adds the configured number of distance evaluations per valid shaded hit. More probes are more expensive and alter the probe distribution; no measured performance claim is made. Existing multi-threaded row-progress limitations remain unchanged.
 - Useful next work is comparing against a higher-cost hemisphere visibility mode, tuning representative fractal scenes, and benchmarking fixed settings. AO selection currently requires startup configuration rather than a live toggle.
 
+## 2026-11-13 — Graphical launcher and shared application configuration
+
+### Implemented and decisions
+
+- Added a Swing main menu: `clojure -M:run` now opens the launcher; `--launcher` opens it explicitly. Existing rendering arguments still run directly, and `--viewer` opens the default viewer without the menu. CLI PNG export and help remain available without a graphical desktop.
+- Added supplied-scene selection and browsing for trusted `.clj` files, width/height/thread controls, shading/AO/blending choices, and a collapsible Advanced section for camera, light/color, AO sampling, and marching limits. Selected-scene defaults are loaded into the form, rather than replaced by generic UI defaults. Hard/opaque geometry and Flat/AO dependencies disable irrelevant controls.
+- Added Open viewer, Render PNG, Reset to scene defaults, and Cancel export actions. Viewers and exports snapshot the form settings; later menu edits apply to later renders. Scene files are evaluated once per selection in a background executor. Failed scene loads restore the previous selection and keep its definition. Reset uses the loaded definition without evaluating the file again.
+- Kept code responsibilities separate: `launcher_form` defines/layouts fields and parses values; `launcher` coordinates menu actions, dialogs, and background tasks; `configuration` prepares effective scene settings for both entry paths; `application` exposes reusable viewer/export operations without process exit. The CLI remains in `core`; scene-distance and lighting calculations remain outside Swing. Rendering and scene evaluation do not run on the EDT.
+- Added threaded GUI row progress and recoverable error messages. PNG selection adds a missing extension and confirms overwrites. Cancellation is checked between rows and suppresses incomplete saves; once PNG writing starts, its cancel button is disabled. Closing a viewer preserves the menu, while closing the menu leaves other viewers available.
+- Fixed a pre-existing parallel-rendering issue exposed by freely selectable image dimensions/thread counts: replaced fractional row boundaries with integer partitions, limited task count to image height, preserved row order, and propagated cancellation rather than assembling a partial image. Added serialized total-completed-row callbacks for threaded rendering, restoring progress in CLI exports as well. Outstanding tasks are cancelled during cleanup; row tasks also check interruption.
+- Added the launcher usage guide and updated README/lighting commands and source boundaries. Exact editable numeric fields were used for repeatability rather than arbitrary slider ranges. Saved presets, command copying, live updates to open viewers, and a geometry/fractal editor remain future work.
+
+### Verification
+
+- Full headless test suite: 43 tests, 11,144 assertions, zero failures/errors. Added tests for effective scene defaults, edited configuration and validation, actual Swing form values/dependent controls, shared CLI preparation, reusable PNG export without process exit, and cancellation preserving existing files.
+- Parallel image checks compare pixels with the sequential renderer at 13 × 11 with 3 tasks, 5 × 3 with 8 requested threads, and 17 × 13 with 2 tasks. Verified ordered zero-to-height completed-row callbacks and cancellation returning no partial image. Test runner shuts down Clojure agent pools after the suite so parallel tests terminate promptly.
+- Native desktop checks loaded Mandelbulb and AO scenes, verified scene-specific values and disabled controls, exercised Flat/AO/reset behavior, exported a 121 × 79 image with 3 threads, and observed GUI progress reaching 100%. Export pixels matched a direct render with the same form values. Opened the configured viewer, observed a full-resolution frame, closed it, and verified the launcher remained open.
+- Further native checks verified recoverable missing-scene and invalid-number errors, cancellation producing no PNG, and cancellation status. Visually inspected the real launcher including its advanced fields, scrolling, and footer.
+- Separate CLI checks verified help, a 53 × 37 AO-only export with 3 threads and complete progress, and error exit statuses for conflicting launcher/render and viewer/export selections. All expected statuses matched. Origin was fetched before development; no additional teammate commits needed integration.
+
+### Limitations and next steps
+
+- The menu applies settings to new jobs only and does not persist them between sessions. Switching scenes or resetting restores 800 × 450 and one thread, alongside the scene's own rendering settings. Fractal parameters and object editing remain in scene files.
+- Cancellation is cooperative between rows; expensive rows can delay response. PNG encoding may finish after the launcher closes if writing has already started. One menu export or scene load runs at a time; other viewer windows can render independently and compete for CPU resources.
+- No benchmark, speedup, automatic quality/memory budget, or packaged desktop installer is claimed. Scene files remain executable Clojure and should be trusted. Future enhancements can add saved presets or live controls without putting rendering logic into the form.
+
+## 2026-11-13 — Floor and hard directional shadows
+
+### Implemented and decisions
+
+- Added `shadows` as a separate, pure visibility module. It reuses the independent single-ray marcher from a surface point offset along its outward normal, tracing toward the existing directional light. Results distinguish blocked, clear within a finite range, and unresolved step-limit cases.
+- Applied resolved visibility only to direct diffuse light: `ambient * AO + diffuseStrength * diffuse * visibility`. Ambient fill and AO are unaffected by the shadow ray. Disabled shadows add no queries; surfaces without direct light, zero normals, AO-only display, and flat/custom coloring skip shadow tracing.
+- Added validated shadow settings (off/hard mode, surface bias, hit tolerance, maximum travel distance, and step budget), CLI `--shadows off|hard`, and launcher Effects/Advanced controls. CLI mode overrides preserve scene-specific limits. Flat and AO-only displays disable irrelevant shadow controls. Shadows default to off so existing scenes retain their appearance.
+- Required positive finite shadow distances and bias greater than shadow epsilon as a basic self-hit safeguard; documented that this does not guarantee correct offsets on all scales or approximate fields. Unresolved secondary rays display cyan rather than silently becoming light or shadow; magenta remains the primary-ray step-limit diagnostic.
+- Added reusable `scene/floor-plane`, an exact signed half-space distance `y - height`. Added `scenes/shadows.clj`: sphere and cube resting on a floor at Y = −2, with a light direction chosen to make their cast shadows visible. The floor is hard-unioned separately from the object group, preventing smooth object unions from melting it into the ground. Geometry retains a scene-wide material color.
+- Added off/hard comparison images, a floor/shadow guide, and updates to README, launcher instructions, lighting, and custom-scene documentation. Scene selection includes the new floor/shadow demo. Origin was checked before the change; no additional teammate commits needed integration. Previously implemented launcher work remains in the working tree.
+
+### Verification
+
+- `clojure -M:test`: 49 tests, 11,251 assertions, zero failures/errors. New tests cover floor signs/height validation, blocked and clear light paths, self-hit prevention on a plane, finite shadow range, unresolved step budgets, ambient/AO preservation, all three diffuse modes, skipped-query costs, CLI/scene configuration and invalid settings, launcher dependencies, and a known shadowed image pixel.
+- Compared shadow classifications for 49 floor origins against an independent analytic sphere-intersection condition, avoiding the tangency boundary. All matched.
+- Exported the final demo at 420 × 300 with shadows off, hard shadows on one thread, and hard shadows on three threads. All CLI exports exited successfully. The toggle changes pixels, and the threaded hard-shadow PNG is byte-identical to the single-thread PNG. Both comparison images contain zero cyan secondary-budget and zero magenta primary-budget pixels. Visually inspected the final comparison and its visible floor shadows.
+- Native launcher checks loaded the demo's hard-shadow mode and 256-step shadow budget, checked Flat/AO-only control dependencies and reset, and exported a 121 × 79 PNG with three threads while observing progress reach 100%.
+
+### Limitations and next steps
+
+- This adds sharp binary shadows for one directional light, not soft shadows, area/point lights, transparency, or reflections. Floor addition remains a scene-code choice rather than a universal menu toggle, and floor color is not independent of other objects.
+- Finite range can omit distant blockers. Bias can cause self-shadow artifacts or detached contact shadows, and grazing/conservative fields can exhaust the step budget. Approximate Mandelbulb distances require careful tuning rather than assuming exact geometric visibility.
+- Shadow work adds up to the configured secondary step budget for each eligible hit and can delay cooperative row-boundary cancellation. No performance benchmark or frame-rate claim was made. A later change can introduce soft shadows or separate materials without mixing visibility logic into Swing.
+
 ## Future entry checklist
 
 For each session, record the date, objective, completed changes, reasons for decisions, checks and results, unresolved issues, and next steps. Focus on rendering development; omit repository housekeeping and editorial changes. Include measured performance only after actual runs, with settings and machine context.

@@ -1,5 +1,5 @@
 (ns ray-marcher.render
-  "Sequential primary-ray rendering. This namespace has no Swing dependencies."
+  "Primary-ray image rendering with optional parallel row ranges. No Swing dependencies."
   (:require [ray-marcher.camera :as camera]
             [ray-marcher.lighting :as lighting]
             [ray-marcher.march :as march]
@@ -43,18 +43,28 @@
            (recur (inc y))))))))
 
 (defn multi-render
+  "Render integer row ranges concurrently, then collect them in image order.
+  Progress callbacks are serialized and report completed rows across all tasks."
   [render-fn width height info]
-  (loop [threads (get info :threads 1)
-         thread-idx 1
-         pixels []
-         queued-futures (loop [thread-idx 1
-                               futures []]
-                          (if (> thread-idx threads)
-                            futures
-                            (recur (inc thread-idx) (conj futures (future (render-fn width height (assoc info :thread-idx thread-idx)))))))]
-    (if (> thread-idx threads)
-      pixels
-      (recur threads (inc thread-idx) (into pixels (deref (let [[head & _] queued-futures] head))) (let [[_ & tail] queued-futures] tail)))))
+  (let [threads (min height (get info :threads 1))
+        progress (:on-progress info)
+        completed (atom 0)
+        progress-lock (Object.)
+        report! (when progress
+                  (fn [_ _]
+                    (locking progress-lock (progress (swap! completed inc) height))))
+        _ (when progress (progress 0 height))
+        tasks (mapv (fn [index]
+                      (future (render-fn width height
+                                         (assoc info :threads threads :thread-idx index :on-progress report!))))
+                    (range 1 (inc threads)))]
+    (try
+      (loop [remaining tasks, pixels []]
+        (if-let [task (first remaining)]
+          (when-let [part @task]
+            (recur (next remaining) (into pixels part)))
+          pixels))
+      (finally (doseq [task tasks] (when-not (future-done? task) (future-cancel task)))))))
 
 (defn pixels-to-image [width height pixels]
   (let [image (BufferedImage. width height BufferedImage/TYPE_INT_RGB)
@@ -77,29 +87,26 @@
                        threads 1
                        thread-idx 1}}]
    (let [shade (or color-fn (lighting/make-shader scene-distance lighting))
-         height-div (max 1 (/ height threads))
-         max-height (if (= thread-idx threads) height (* thread-idx height-div))
-         min-height (* height-div (- thread-idx 1))]
-     (loop [y min-height
-            pixels []] 
-       (if (or (cancelled?) (>= y max-height))
-         (if (>= y max-height) pixels
-             nil)
-         (recur
-          (inc y)
-          (loop [x 0
-                 x_pixels pixels]
-            (if (>= x width)
-              x_pixels
-              (recur
-               (inc x)
-               (conj x_pixels (int (shade (march/raymarch scene-distance (:origin camera) (camera/ray-direction camera x y width height) settings)))))))))))))
+         min-height (quot (* height (dec thread-idx)) threads)
+         max-height (quot (* height thread-idx) threads)
+         cancelled-now? #(or (.isInterrupted (Thread/currentThread)) (cancelled?))]
+     (loop [y min-height, pixels []]
+       (cond
+         (cancelled-now?) nil
+         (>= y max-height) pixels
+         :else
+         (let [row (mapv (fn [x]
+                           (int (shade (march/raymarch scene-distance (:origin camera)
+                                                      (camera/ray-direction camera x y width height) settings))))
+                         (range width))]
+           (when on-progress (on-progress (inc y) height))
+           (recur (inc y) (into pixels row))))))))
 
 (defn render-image
-  ([width height]
-   (render-image width height {}))
+  "Generate an image using one or more rendering tasks. Cancellation returns nil."
+  ([width height] (render-image width height {}))
   ([width height info]
    (if (= 1 (get info :threads 1))
      (render-image-sync width height info)
-     (pixels-to-image width height (multi-render render-pixels width height info)))
-   ))
+     (when-let [pixels (multi-render render-pixels width height info)]
+       (pixels-to-image width height pixels)))))

@@ -178,6 +178,6 @@ You can provide your own signed-distance functions rather than being limited to 
   floor-distance)
 ```
 
-Place the `defn` before the final scene map. The floor extends infinitely in X and Z; points below it are inside its solid half-space. There are no directional-light cast shadows. Enabling AO can darken ambient light around contacts; adding a floor alone with AO off does not produce contact shading.
+Place the `defn` before the final scene map. The floor extends infinitely in X and Z; points below it are inside its solid half-space. Use `(scene/floor-plane -2)` as a reusable version of this floor function. Enable `--shadows hard` for directional-light cast shadows or AO for ambient contact darkening. A floor alone does not enable either effect. Keep the floor outside any smoothly blended object group; see [shadows.md](shadows.md) for a complete example and shadow settings.
 
 The marcher needs signed distances or safe distance estimates: positive outside, zero on the surface, negative inside. An arbitrary formula whose zero describes a surface is not automatically safe for marching. Fractals and other advanced geometry will need appropriate distance estimates; curved light paths and non-Euclidean spaces require additional traversal work beyond defining a new scene file.
