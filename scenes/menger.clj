@@ -3,14 +3,13 @@
 
 ;; A turquoise cube carved into repeating tunnels. Y is height.
 ;; Current depth is 5. Use 2 for a lighter render or 3 to match the saved preview.
-{:scene-distance (fractals/menger-sponge [10 0 0] 6 5)
+{:scene-distance (fractals/menger-sponge [10 0 0] 6 5 0x68D8C5)
 
  :camera {:position [-1 6 -9]
           :look-at [10 -0.5 0]
           :fov 40}
 
- :lighting {:base-color 0x68D8C5
-            :toward-light [-0.8 1.0 0.5]
+ :lighting {:toward-light [-0.8 1.0 0.5]
             :ambient 0.055
             :diffuse-strength 0.945
             :normal-step 0.0005
